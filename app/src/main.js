@@ -685,8 +685,12 @@ function handle(event) {
     case "pace":     pace = event; renderPace(); return;
     case "feedback": return onFeedback(event);
     case "interim":  return setCaption(event.text, false);
+    case "notice":   // the checks before a call: the model and the listening service (2026-10-16)
+      if (el.start.disabled) el.start.textContent = event.text;
+      return;
     case "error":
       if (!el.setup.hidden) {
+        setStarting(false);
         el.setupError.textContent = event.text;
         el.setupError.hidden = false;
       } else {

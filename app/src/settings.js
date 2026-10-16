@@ -1010,7 +1010,18 @@ function buildProvider(p) {
     provButton("Save", true, () => saveProvider(p.id)),
     provButton("Test connection", false, () => {
       setResult(card, "Checking...");
+      card.dataset.probeChosen = "1";     // after the list, ask the chosen model for an answer too
       send("provider_check", { vendor: p.id });
+    }),
+    provButton("Test all models", false, () => {
+      const models = chatModels(card);
+      if (!models.length) {
+        setResult(card, "Test the connection first, so the provider lists its models.", "err");
+        return;
+      }
+      card.querySelector(".prov-probes").replaceChildren();
+      setResult(card, `Asking ${models.length} models for a short answer...`);
+      send("probe_models", { vendor: p.id, models });
     }),
   );
   if (p.key_env) {
@@ -1027,7 +1038,10 @@ function buildProvider(p) {
   const result = document.createElement("p");
   result.className = "prov-result";
   result.setAttribute("aria-live", "polite");
-  body.append(result);
+  const probes = document.createElement("ul");
+  probes.className = "prov-probes";
+  probes.setAttribute("translate", "no");
+  body.append(result, probes);
 
   card.append(head, body);
   return card;
@@ -1105,6 +1119,62 @@ function onProviderCheck(e) {
   pick.replaceChildren(option("", models.length ? `${models.length} models: choose one` : "The provider listed no models", true),
     ...models.map((m) => option(m, m, false)));
   setResult(card, `Connected in ${e.ms} ms.`, "ok");
+  if (card.dataset.probeChosen) {
+    delete card.dataset.probeChosen;
+    const p = (current.provider_catalog || []).find((x) => x.id === e.vendor);
+    if (p && p.model) {
+      setResult(card, `Connected. Asking ${p.model} for a short answer...`);
+      card.dataset.single = "1";
+      send("probe_models", { vendor: e.vendor, models: [p.model] });
+    }
+  }
+}
+
+// Embeddings, speech, images and moderation models cannot write the lines; asking them only
+// spends requests. The provider's list is what the last connection test returned.
+const NOT_CHAT = /embed|whisper|tts|audio|speech|transcri|image|vision-only|dall-e|imagen|veo|moderation|guard|rerank|aqa|realtime|search/i;
+function chatModels(card) {
+  return [...card.querySelectorAll('select[data-name="pick"] option')].map((o) => o.value)
+    .filter((m) => m && !NOT_CHAT.test(m));
+}
+
+function onProbe(e) {
+  const card = $(`prov-${e.vendor}`);
+  if (!card) return;
+  if (card.dataset.single) {
+    delete card.dataset.single;
+    setResult(card, e.ok ? `${e.model} answered in ${e.ms} ms. Ready for a call.` : `${e.model}: ${e.error}`,
+              e.ok ? "ok" : "err");
+    return;
+  }
+  const list = card.querySelector(".prov-probes");
+  const li = document.createElement("li");
+  li.className = e.ok ? "ok" : "err";
+  li.dataset.ms = e.ok ? e.ms : 1e9;
+  const name = document.createElement("span");
+  name.textContent = e.model;
+  const info = document.createElement("span");
+  info.textContent = e.ok ? `${e.ms} ms` : e.error;
+  li.append(name, info);
+  if (e.ok) {
+    const use = provButton("Use", false, () => {
+      send("provider_save", { vendor: e.vendor, values: { model: e.model, enabled: true } });
+      flash(`${e.model} saved for ${labelOf(e.vendor)}`);
+    });
+    li.append(use);
+  }
+  // fastest working models first, failures last
+  const after = [...list.children].find((x) => Number(x.dataset.ms) > Number(li.dataset.ms));
+  list.insertBefore(li, after || null);
+}
+
+function onProbeDone(e) {
+  const card = $(`prov-${e.vendor}`);
+  if (!card || card.dataset.single) return;
+  const ok = card.querySelectorAll(".prov-probes li.ok").length;
+  const all = card.querySelectorAll(".prov-probes li").length;
+  setResult(card, ok ? `${ok} of ${all} models answered. The fastest is first: press Use to pick it.`
+                     : `None of the ${all} models answered.`, ok ? "ok" : "err");
 }
 
 function onScanLocal(e) {
@@ -1242,6 +1312,12 @@ function handle(e) {
       return;
     case "scan_local":
       onScanLocal(e);
+      return;
+    case "probe":
+      onProbe(e);
+      return;
+    case "probe_done":
+      onProbeDone(e);
       return;
     case "error":
       if (analyzing) {

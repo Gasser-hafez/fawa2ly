@@ -226,6 +226,10 @@ every string in both pages has a translation here.
     "Save keys": "حفظ المفاتيح",
     // ---- settings: API keys and providers (2026-10-16) ----
     "API keys and providers": "مفاتيح API والمزوّدون",
+    "Test all models": "اختبار كل النماذج",
+    "Use": "استخدام",
+    "Test the connection first, so the provider lists its models.": "اختبر الاتصال أولًا ليعرض المزوّد نماذجه.",
+    "Checking the model and the listening service": "جارٍ فحص النموذج وخدمة الاستماع",
     "This app uses your own keys: Deepgram to listen, and a model provider to write the lines. Keys are saved only on this computer, in %APPDATA%\\Fawa2ly\\.env, and this window never shows a saved key again.": "هذا التطبيق يستخدم مفاتيحك: Deepgram للاستماع، ومزوّد نموذج لكتابة السطور. تُحفظ المفاتيح على هذا الكمبيوتر فقط، في %APPDATA%\\Fawa2ly\\.env، ولا تعرض هذه النافذة أي مفتاح محفوظ مرة أخرى.",
     "Save key": "حفظ المفتاح",
     "Not needed if Listening is set to transcribe on this computer.": "غير مطلوب إذا كان الاستماع مضبوطًا على التفريغ على هذا الكمبيوتر.",

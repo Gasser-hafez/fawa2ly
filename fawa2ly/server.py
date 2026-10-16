@@ -88,6 +88,7 @@ from .context.builder import preset_info
 from .dictation import Dictation
 from .engine import Engine, EngineConfig, list_devices
 from .limits import MAX_UPLOAD_BYTES
+from .preflight import preflight_call
 
 try:
     from dotenv import load_dotenv
@@ -201,7 +202,8 @@ class SessionServer:
 
     def __init__(self, make_engine: Callable[[dict, Callable[[dict], None]], object],
                  host: str = HOST, port: int = PORT, history: int = HISTORY,
-                 autostart: Optional[dict] = None, allow_origins: tuple = ()):
+                 autostart: Optional[dict] = None, allow_origins: tuple = (),
+                 preflight: Optional[Callable] = None):
         if host not in LOOPBACK_HOSTS:
             raise ValueError(f"refusing to listen on {host}: the engine has no authentication, "
                              "so it only serves this machine (127.0.0.1)")
@@ -210,6 +212,8 @@ class SessionServer:
         self.port = port
         self.history_size = history
         self.make_engine = make_engine
+        self.preflight = preflight            # async (chosen) -> problems; None skips it (tests)
+        self._checking = False
         self.autostart = autostart
         self.clients: set = set()
         self.history: list[dict] = []
@@ -498,6 +502,18 @@ class SessionServer:
             if key in chosen:
                 setattr(s, key, chosen[key])
         user_settings.save(s)                     # the next call opens on these choices
+        if self.preflight is not None:
+            # A model that fails is found here, not on the interviewer's first question.
+            if self._checking:
+                return                            # a second click while the first is checked
+            self._checking = True
+            self.publish({"type": "notice", "text": "Checking the model and the listening service"})
+            try:
+                problems = await self.preflight(chosen)
+            finally:
+                self._checking = False
+            if problems:
+                raise RuntimeError("The call was not started. " + " ".join(f"{p}." for p in problems))
         self.engine = self.make_engine(chosen, self.publish)
         self.session = asyncio.create_task(self._run_session())
 
@@ -586,6 +602,13 @@ class SessionServer:
             await ws.send(json.dumps({"type": "provider_check", **await check_provider(str(msg.get("vendor") or ""))}))
         elif cmd == "scan_local":
             await self.handle_scan_local(ws)
+        elif cmd == "probe_models":
+            from .preflight import probe_models
+            vendor = str(msg.get("vendor") or "")
+            models = [str(m) for m in (msg.get("models") or []) if isinstance(m, str)]
+            for r in await probe_models(vendor, models):
+                await ws.send(json.dumps({"type": "probe", **r}))
+            await ws.send(json.dumps({"type": "probe_done", "vendor": vendor}))
         elif cmd == "devices":
             await self.handle_devices(ws)
         elif cmd == "speedtest":
@@ -856,7 +879,7 @@ def main(argv=None) -> int:
 
     try:
         server = SessionServer(make_engine, host=a.host, port=a.port, autostart=None if a.idle else {},
-                               allow_origins=tuple(a.allow_origin))
+                               allow_origins=tuple(a.allow_origin), preflight=preflight_call)
         asyncio.run(server.run())
     except KeyboardInterrupt:
         pass

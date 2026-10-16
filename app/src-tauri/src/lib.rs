@@ -210,10 +210,45 @@ pub(crate) fn start_engine(app: &AppHandle) -> Option<Child> {
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
     match cmd.spawn() {
-        Ok(child) => Some(child),
+        Ok(child) => {
+            #[cfg(windows)]
+            kill_with_app(&child);
+            Some(child)
+        }
         Err(e) => {
             eprintln!("could not start the engine {}: {e}", exe.display());
             None
+        }
+    }
+}
+
+/// RunEvent::Exit stops the engine when the app quits normally, but not when the app is killed (the
+/// installer replacing it, Task Manager, a crash). The engine then kept running, held its files
+/// open and made the next install fail with "Error opening file for writing" (2026-10-16). A Job
+/// Object that kills its processes when its last handle closes covers every way the app can end:
+/// the handle is never closed here, so Windows closes it when this process is gone.
+#[cfg(windows)]
+fn kill_with_app(child: &Child) {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+        SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+    unsafe {
+        let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+        if job.is_null() {
+            return;
+        }
+        let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        let ok = SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            &info as *const _ as *const std::ffi::c_void,
+            std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        );
+        if ok != 0 {
+            AssignProcessToJobObject(job, child.as_raw_handle() as _);
         }
     }
 }
