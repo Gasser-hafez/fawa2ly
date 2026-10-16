@@ -64,6 +64,7 @@ import base64
 import json
 import os
 import sys
+import time
 from http import HTTPStatus
 from typing import Callable, Optional
 
@@ -106,15 +107,30 @@ def available_providers() -> list[dict]:
 
     Offering one without a key would only produce an error mid-interview. Key values are never
     read out here, only whether the variable is set."""
-    from .llm.openai_compat import VENDORS
-    out = []
-    for name, v in VENDORS.items():
-        key = v.get("key_env")
-        ready = bool(v.get("local")) or bool(v.get("key_optional")) or bool(key and os.environ.get(key))
-        if ready:
-            out.append({"vendor": name, "local": bool(v.get("local")),
-                        "model": os.environ.get(f"{name.upper()}_MODEL") or v["model"]})
-    return out
+    from .llm.openai_compat import all_vendors
+    return [{"vendor": name, "label": v["label"], "local": bool(v.get("local")), "model": v["model"]}
+            for name, v in all_vendors().items() if user_settings.provider_ready(v)]
+
+
+async def check_provider(vendor: str, timeout: float = 8.0) -> dict:
+    """Reach a provider with the key and address it has now and list its models: proves the key, the
+    address and that something is listening, without spending a request on an answer."""
+    from .llm.openai_compat import OpenAICompatibleLLM
+    t0 = time.monotonic()
+    llm = None
+    try:
+        llm = OpenAICompatibleLLM.from_env(vendor, require_model=False)
+        models = await asyncio.wait_for(llm.list_models(), timeout)
+        return {"vendor": vendor, "ok": True, "ms": round((time.monotonic() - t0) * 1000), "models": models}
+    except Exception as e:
+        text = "no answer in time" if isinstance(e, asyncio.TimeoutError) else f"{type(e).__name__}: {e}"
+        return {"vendor": vendor, "ok": False, "error": text[:300]}
+    finally:
+        if llm is not None:
+            try:
+                await llm.close()
+            except Exception:
+                pass
 
 
 def config_from(base: EngineConfig, chosen: dict) -> EngineConfig:
@@ -386,6 +402,40 @@ class SessionServer:
                       "providers": available_providers(), "presets": available(),
                       "preset_modes": available_modes(), "preset_info": preset_info()})
 
+    async def handle_provider_config(self, ws, cmd: str, msg: dict) -> None:
+        """The API keys page (2026-10-16): change a provider, add an OpenAI-compatible endpoint (and
+        its key, if it has one), or remove one that was added. Every window is then told."""
+        try:
+            if cmd == "provider_save":
+                user_settings.save_provider(str(msg.get("vendor") or ""), msg.get("values") or {})
+            elif cmd == "provider_add":
+                v = msg.get("values") or {}
+                pid = user_settings.add_custom_provider(v.get("label"), v.get("base_url"), v.get("model"))
+                if (v.get("key") or "").strip():
+                    from .llm.openai_compat import custom_key_env
+                    user_settings.save_keys({custom_key_env(pid): v["key"]})
+            else:
+                user_settings.remove_custom_provider(str(msg.get("vendor") or ""))
+        except ValueError as e:
+            await ws.send(json.dumps({"type": "error", "text": str(e)}))
+            return
+        self._publish_settings()
+
+    async def handle_scan_local(self, ws) -> None:
+        """Look for model servers on this computer (Ollama, LM Studio, llama.cpp, vLLM, Jan) at the
+        addresses set for them. One that answers is turned on, so it is offered in the model list."""
+        from .llm.openai_compat import all_vendors
+        local = [vid for vid, v in all_vendors().items() if v.get("local")]
+        results = await asyncio.gather(*(check_provider(vid, timeout=2.0) for vid in local))
+        for r in results:
+            if r["ok"]:
+                values = {"enabled": True}
+                if not all_vendors()[r["vendor"]].get("model") and r["models"]:
+                    values["model"] = r["models"][0]
+                user_settings.save_provider(r["vendor"], values)
+        await ws.send(json.dumps({"type": "scan_local", "results": results}))
+        self._publish_settings()
+
     async def handle_devices(self, ws) -> None:
         """The speakers and microphones there are, for the settings window. Listing opens PortAudio,
         which takes a moment, so it runs off the event loop; only the window that asked is answered."""
@@ -471,6 +521,12 @@ class SessionServer:
             await self.handle_cv(ws, msg)
         elif cmd == "keys":
             await self.handle_keys(ws, msg.get("values"))
+        elif cmd in ("provider_save", "provider_add", "provider_remove"):
+            await self.handle_provider_config(ws, cmd, msg)
+        elif cmd == "provider_check":
+            await ws.send(json.dumps({"type": "provider_check", **await check_provider(str(msg.get("vendor") or ""))}))
+        elif cmd == "scan_local":
+            await self.handle_scan_local(ws)
         elif cmd == "devices":
             await self.handle_devices(ws)
         elif cmd == "speedtest":

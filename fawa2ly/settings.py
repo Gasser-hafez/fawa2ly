@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import asdict, dataclass, field
 from typing import Optional
 
@@ -55,9 +56,124 @@ def env_path() -> str:
 
 def key_names() -> tuple[str, ...]:
     """Deepgram, then each model provider's key, as the provider table names them."""
-    from .llm.openai_compat import VENDORS
-    names = ["DEEPGRAM_API_KEY"] + [v["key_env"] for v in VENDORS.values() if v.get("key_env")]
+    from .llm.openai_compat import all_vendors
+    names = ["DEEPGRAM_API_KEY"] + [v["key_env"] for v in all_vendors().values() if v.get("key_env")]
     return tuple(dict.fromkeys(names))
+
+
+# ---- model providers (2026-10-16) ----
+# What the user changed about a provider: its address, its model, its temperature, whether it is
+# offered at all; and the OpenAI-compatible endpoints they added themselves ("custom": true). Kept in
+# settings.json under "providers". Keys never go here: they stay in .env, as above.
+
+PROVIDER_FIELDS = ("base_url", "model", "temperature", "enabled", "label")
+
+
+def _clean_provider_values(values: dict, custom: bool) -> dict:
+    if not isinstance(values, dict):
+        raise ValueError("provider values must be an object")
+    out = {}
+    for k, v in values.items():
+        if k not in PROVIDER_FIELDS or (k == "label" and not custom):
+            continue
+        if k == "base_url":
+            v = (v or "").strip().rstrip("/")
+            if v and not re.fullmatch(r"https?://[^\s/]+(/[^\s]*)?", v):
+                raise ValueError("the address must start with http:// or https://")
+            if not v and custom:
+                raise ValueError("a custom endpoint needs an address")
+        elif k in ("model", "label"):
+            v = (v or "").strip()
+            if len(v) > 200 or "\n" in v:
+                raise ValueError(f"{k} must be one short line")
+            if k == "label" and not v:
+                raise ValueError("give the endpoint a name")
+        elif k == "temperature":
+            if v in (None, ""):
+                v = None
+            else:
+                try:
+                    v = float(v)
+                except (TypeError, ValueError):
+                    raise ValueError("temperature must be a number") from None
+                if not 0 <= v <= 2:
+                    raise ValueError("temperature must be between 0 and 2")
+        elif k == "enabled":
+            v = bool(v)
+        out[k] = v
+    return out
+
+
+def save_provider(vendor: str, values: dict) -> None:
+    """Change one provider. An empty address or model goes back to the provider's own default; an
+    empty temperature goes back to the app's default."""
+    from .llm.openai_compat import VENDORS
+    s = load()
+    entry = dict(s.providers.get(vendor) or {})
+    custom = bool(entry.get("custom"))
+    if vendor not in VENDORS and not custom:
+        raise ValueError(f"unknown provider {vendor!r}")
+    for k, v in _clean_provider_values(values, custom).items():
+        if v in (None, "") and k != "enabled":
+            entry.pop(k, None)
+        else:
+            entry[k] = v
+    s.providers[vendor] = entry
+    save(s)
+
+
+def add_custom_provider(label: str, base_url: str, model: str = "") -> str:
+    """A new OpenAI-compatible endpoint; returns its id, which also names its key (CUSTOM_<ID>_API_KEY)."""
+    values = _clean_provider_values({"label": label, "base_url": base_url, "model": model}, custom=True)
+    s = load()
+    from .llm.openai_compat import VENDORS
+    base = "custom-" + (re.sub(r"[^a-z0-9]+", "-", values["label"].lower()).strip("-") or "endpoint")[:30]
+    pid, n = base, 2
+    while pid in s.providers or pid in VENDORS:
+        pid, n = f"{base}-{n}", n + 1
+    s.providers[pid] = {"custom": True, "enabled": True, **{k: v for k, v in values.items() if v}}
+    save(s)
+    return pid
+
+
+def remove_custom_provider(pid: str) -> None:
+    """Forget an endpoint the user added, and its key. The built-in providers cannot be removed."""
+    from .llm.openai_compat import custom_key_env
+    s = load()
+    if not (s.providers.get(pid) or {}).get("custom"):
+        raise ValueError(f"{pid!r} is not an endpoint you added")
+    save_keys({custom_key_env(pid): ""})       # while the endpoint still exists, so the name is known
+    del s.providers[pid]
+    if s.vendor == pid:
+        s.vendor, s.model = Settings.vendor, None
+    save(s)
+
+
+def provider_ready(v: dict) -> bool:
+    """On, has a model, and has a key unless it needs none."""
+    key_env = v.get("key_env")
+    has_key = not key_env or v.get("key_optional") or bool(os.environ.get(key_env))
+    return bool(v.get("enabled") and v.get("model") and has_key)
+
+
+def provider_catalog() -> list[dict]:
+    """Every provider for the API keys page: what it is, how it is set, whether it can be used.
+    Says whether a key is set, never the key."""
+    from .llm.openai_compat import all_vendors
+    out = []
+    for vid, v in all_vendors().items():
+        key_env = v.get("key_env")
+        kind = "custom" if v.get("custom") else "local" if v.get("local") else "cloud"
+        out.append({
+            "id": vid, "label": v["label"], "kind": kind, "enabled": bool(v.get("enabled")),
+            "base_url": v["base_url"], "default_base_url": v.get("default_base_url", ""),
+            "model": v.get("model") or "", "default_model": v.get("default_model") or "",
+            "temperature": v.get("temperature", 0.3), "key_env": key_env,
+            "key_set": bool(key_env and os.environ.get(key_env)),
+            "key_optional": bool(v.get("key_optional")) or not key_env,
+            "ready": provider_ready(v),
+        })
+    return out
 
 
 def keys_status() -> dict[str, bool]:
@@ -282,12 +398,14 @@ class Settings:
     mode: str = "interview"          # the call: interview | meeting (picks the prompt and the roles)
     speaker_device: str = ""         # the call's audio: a loopback device by name; "" = Windows default
     mic_device: str = ""             # the user's microphone by name; "" = Windows default
+    providers: dict = field(default_factory=dict)  # per-provider changes and custom endpoints (see save_provider)
     cv_name: str = ""                # before item 5: names the old cv.txt when it is moved in
     fields: dict = field(default_factory=dict)   # room for later without a migration
 
     def to_json(self) -> dict:
         d = asdict(self)
         d["keys"] = keys_status()        # set or not, never the values
+        d["provider_catalog"] = provider_catalog()
         from .stt import whisper_available
         d["whisper_available"] = whisper_available()   # roadmap item 26: offline STT installed?
         d["documents"] = {m: list_documents(m) for m in MODES}
@@ -318,6 +436,8 @@ def load() -> Settings:
         s.mode = MODES[0]
     if s.ui_lang not in UI_LANGS:
         s.ui_lang = UI_LANGS[0]
+    if not isinstance(s.providers, dict):
+        s.providers = {}
     if s.stt_vendor not in ("deepgram", "whisper"):
         s.stt_vendor = "deepgram"
     return s

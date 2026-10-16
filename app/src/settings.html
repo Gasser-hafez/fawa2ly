@@ -39,6 +39,25 @@
       #hotkeys input { cursor: pointer; font-family: var(--mono); }
       .hk-why { font-size: 12px; color: var(--warm); }
       #keys { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+      /* API keys and providers (2026-10-16): one native <details> per provider */
+      .prov-list { display: flex; flex-direction: column; gap: 6px; }
+      .prov { border: 1px solid var(--edge-2); border-radius: 9px; background: var(--panel-solid); }
+      .prov[open] { border-color: var(--edge); }
+      .prov > summary { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; list-style: none; font-size: 13.5px; }
+      .prov > summary::-webkit-details-marker { display: none; }
+      .prov > summary::after { content: "\203A"; margin-inline-start: 4px; color: var(--ink-3); transition: transform .15s; }
+      .prov[open] > summary::after { transform: rotate(90deg); }
+      .prov-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--edge); flex: none; }
+      .prov-dot.ready { background: var(--ok); }
+      .prov-dot.partial { background: var(--warm); }
+      .prov-name { flex: 1; min-width: 0; font-weight: 600; color: var(--ink); }
+      .prov-state { font-size: 12px; color: var(--ink-3); }
+      .prov-body { display: flex; flex-direction: column; gap: 12px; padding: 4px 12px 14px; }
+      .prov-body .field input { font-family: inherit; }
+      .prov-body .actions button { font-size: 12.5px; padding: 6px 12px; }
+      .prov-result { font-size: 12.5px; color: var(--ink-2); min-height: 16px; line-height: 1.45; }
+      .prov-result.ok { color: var(--ok); }
+      .prov-result.err { color: var(--danger-ink); }
 
       textarea {
         font: inherit; font-size: 14px; line-height: 1.5; color: var(--ink);
@@ -384,15 +403,52 @@
 
         <section class="section" id="sec-keys" data-section="keys" hidden>
           <header>
-            <h2>API keys</h2>
-            <p>This app uses your own keys: Deepgram to listen, and one model provider to write the lines. They are saved only on this computer, in %APPDATA%\Fawa2ly\.env, and this window never shows a saved key again.</p>
+            <h2>API keys and providers</h2>
+            <p>This app uses your own keys: Deepgram to listen, and a model provider to write the lines. Keys are saved only on this computer, in %APPDATA%\Fawa2ly\.env, and this window never shows a saved key again.</p>
           </header>
           <div class="group">
+            <h3>Listening</h3>
             <div id="keys"></div>
             <div class="actions">
-              <button type="button" class="primary" id="save-keys">Save keys</button>
+              <button type="button" class="primary" id="save-keys">Save key</button>
             </div>
-            <p class="hint">Leave a box empty to keep a key as it is.</p>
+            <p class="hint">Not needed if Listening is set to transcribe on this computer.</p>
+          </div>
+
+          <div class="group">
+            <div class="roles-head">
+              <h3>On this computer</h3>
+              <button type="button" id="scan-local">Scan for local servers</button>
+            </div>
+            <p class="hint">A model server running here: nothing you say leaves this computer and no key is needed. A server that answers the scan is turned on.</p>
+            <p id="scan-status" class="status-line"></p>
+            <div id="prov-local" class="prov-list"></div>
+          </div>
+
+          <div class="group">
+            <h3>Cloud providers</h3>
+            <p class="hint">Open a provider to add its key, then fetch its models and pick one. Only providers marked Ready appear in the model list.</p>
+            <div id="prov-cloud" class="prov-list"></div>
+          </div>
+
+          <div class="group">
+            <h3>Your own endpoints</h3>
+            <p class="hint">Any server that speaks the OpenAI chat completions API: a company gateway, LiteLLM, a proxy, or a model server on another computer.</p>
+            <div id="prov-custom" class="prov-list"></div>
+            <details class="prov" id="add-endpoint">
+              <summary><span class="prov-name">Add an endpoint</span></summary>
+              <div class="prov-body">
+                <div class="row2">
+                  <label class="field"><span>Name</span><input id="new-label" type="text" placeholder="My gateway" /></label>
+                  <label class="field"><span>Address</span><input id="new-url" type="text" spellcheck="false" translate="no" placeholder="https://example.com/v1" /></label>
+                </div>
+                <div class="row2">
+                  <label class="field"><span>Model id</span><input id="new-model" type="text" spellcheck="false" placeholder="Can be fetched after adding" /></label>
+                  <label class="field"><span>Key (optional)</span><input id="new-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste the key" /></label>
+                </div>
+                <div class="actions"><button type="button" class="primary" id="add-endpoint-btn">Add endpoint</button></div>
+              </div>
+            </details>
           </div>
         </section>
 

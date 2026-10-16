@@ -40,9 +40,66 @@ VENDORS = {
     # token is what this project is short of; switch with GROQ_MODEL or --model.
     "groq": {"base_url": "https://api.groq.com/openai/v1", "key_env": "GROQ_API_KEY",
              "model": "openai/gpt-oss-20b"},
+    # The rows below (2026-10-16) are the vendors' documented OpenAI-compatible endpoints, not yet
+    # timed on a call. They have no default model on purpose: model names change faster than this
+    # table, so the user picks one from the vendor's own list (Settings > API keys > Fetch models).
+    # OpenAI's newer models refuse max_tokens and any temperature but the default.
+    "openai": {"base_url": "https://api.openai.com/v1", "key_env": "OPENAI_API_KEY", "model": None,
+               "token_param": "max_completion_tokens", "temperature": None},
+    "anthropic": {"base_url": "https://api.anthropic.com/v1/", "key_env": "ANTHROPIC_API_KEY", "model": None},
+    "openrouter": {"base_url": "https://openrouter.ai/api/v1", "key_env": "OPENROUTER_API_KEY", "model": None},
+    "mistral": {"base_url": "https://api.mistral.ai/v1", "key_env": "MISTRAL_API_KEY", "model": None},
+    "deepseek": {"base_url": "https://api.deepseek.com/v1", "key_env": "DEEPSEEK_API_KEY", "model": None},
+    "xai": {"base_url": "https://api.x.ai/v1", "key_env": "XAI_API_KEY", "model": None},
+    "together": {"base_url": "https://api.together.xyz/v1", "key_env": "TOGETHER_API_KEY", "model": None},
+    "fireworks": {"base_url": "https://api.fireworks.ai/inference/v1", "key_env": "FIREWORKS_API_KEY",
+                  "model": None},
+    # Servers on this computer. Only Ollama is offered until the user turns another on or a scan finds it.
     "ollama": {"base_url": "http://localhost:11434/v1", "key_env": None, "model": "llama3.2",
                "local": True},
+    "lmstudio": {"base_url": "http://localhost:1234/v1", "key_env": None, "model": None, "local": True},
+    "llamacpp": {"base_url": "http://localhost:8080/v1", "key_env": None, "model": None, "local": True},
+    "vllm": {"base_url": "http://localhost:8000/v1", "key_env": None, "model": None, "local": True},
+    "jan": {"base_url": "http://localhost:1337/v1", "key_env": None, "model": None, "local": True},
 }
+
+LABELS = {"cerebras": "Cerebras", "gemini": "Google Gemini", "groq": "Groq", "openai": "OpenAI",
+          "anthropic": "Anthropic Claude", "openrouter": "OpenRouter", "mistral": "Mistral",
+          "deepseek": "DeepSeek", "xai": "xAI Grok", "together": "Together AI", "fireworks": "Fireworks AI",
+          "ollama": "Ollama", "lmstudio": "LM Studio", "llamacpp": "llama.cpp server", "vllm": "vLLM",
+          "jan": "Jan"}
+
+
+def custom_key_env(pid: str) -> str:
+    return f"CUSTOM_{pid.upper().replace('-', '_')}_API_KEY"
+
+
+def all_vendors() -> dict:
+    """The table above with what the user changed in Settings (address, model, temperature, on or
+    off), plus the endpoints they added themselves. Every caller goes through from_env, so this is
+    the one place a provider's configuration is decided."""
+    from ..settings import load
+    conf = load().providers
+    out = {}
+    for name, base in VENDORS.items():
+        o = conf.get(name) or {}
+        v = dict(base, label=LABELS.get(name, name), default_base_url=base["base_url"],
+                 default_model=base["model"])
+        v["model"] = o.get("model") or os.environ.get(f"{name.upper()}_MODEL") or base["model"]
+        v["base_url"] = o.get("base_url") or base["base_url"]
+        if "temperature" in o:
+            v["temperature"] = o["temperature"]
+        v["enabled"] = o.get("enabled", name == "ollama" or not base.get("local"))
+        out[name] = v
+    for pid, o in conf.items():
+        if o.get("custom") and pid not in VENDORS:
+            v = {"label": o.get("label") or pid, "base_url": o.get("base_url") or "", "custom": True,
+                 "key_env": custom_key_env(pid), "key_optional": True, "model": o.get("model"),
+                 "enabled": o.get("enabled", True)}
+            if "temperature" in o:
+                v["temperature"] = o["temperature"]
+            out[pid] = v
+    return out
 
 
 def mute_asyncgen_close_noise() -> None:
@@ -67,11 +124,13 @@ def mute_asyncgen_close_noise() -> None:
 
 class OpenAICompatibleLLM(SuggestionProvider):
     def __init__(self, base_url: str, api_key: Optional[str], model: str, name: str = "openai-compat",
-                 temperature: float = 0.3, client=None, extra: Optional[dict] = None):
+                 temperature: Optional[float] = 0.3, client=None, extra: Optional[dict] = None,
+                 token_param: str = "max_tokens"):
         self.base_url = base_url
         self.model = model
         self.name = name
-        self.temperature = temperature
+        self.temperature = temperature   # None: leave it to the vendor (some models refuse any other)
+        self.token_param = token_param
         self.extra = dict(extra or {})   # vendor-specific request fields, sent through extra_body
         if client is None:
             from openai import AsyncOpenAI
@@ -79,16 +138,23 @@ class OpenAICompatibleLLM(SuggestionProvider):
         self._client = client
 
     @classmethod
-    def from_env(cls, vendor: str, model: Optional[str] = None, **kw) -> "OpenAICompatibleLLM":
-        if vendor not in VENDORS:
-            raise ValueError(f"unknown vendor {vendor!r}; known: {', '.join(VENDORS)}")
-        v = VENDORS[vendor]
+    def from_env(cls, vendor: str, model: Optional[str] = None, require_model: bool = True,
+                 **kw) -> "OpenAICompatibleLLM":
+        vendors = all_vendors()
+        if vendor not in vendors:
+            raise ValueError(f"unknown vendor {vendor!r}; known: {', '.join(vendors)}")
+        v = vendors[vendor]
         key = os.environ.get(v["key_env"]) if v["key_env"] else None
         if v["key_env"] and not key and not v.get("key_optional"):
-            raise RuntimeError(f"{v['key_env']} is not set (put it in .env)")
-        model = model or os.environ.get(f"{vendor.upper()}_MODEL") or v["model"]
+            raise RuntimeError(f"{v['key_env']} is not set (add it under Settings > API keys)")
+        model = model or v["model"]
+        if not model and require_model:
+            raise RuntimeError(f"no model chosen for {v['label']} (pick one under Settings > API keys)")
         kw.setdefault("extra", v.get("extra"))
-        return cls(v["base_url"], key, model, name=vendor, **kw)
+        if "temperature" in v:
+            kw.setdefault("temperature", v["temperature"])
+        kw.setdefault("token_param", v.get("token_param", "max_tokens"))
+        return cls(v["base_url"], key, model or "", name=vendor, **kw)
 
     async def list_models(self) -> list[str]:
         page = await self._client.models.list()
@@ -109,8 +175,10 @@ class OpenAICompatibleLLM(SuggestionProvider):
         stream = None
         drained = False
         try:
-            kwargs = dict(model=self.model, messages=messages, stream=True,
-                          max_tokens=req.max_tokens, temperature=self.temperature)
+            kwargs = dict(model=self.model, messages=messages, stream=True)
+            kwargs[self.token_param] = req.max_tokens
+            if self.temperature is not None:
+                kwargs["temperature"] = self.temperature
             if self.extra:
                 kwargs["extra_body"] = self.extra   # merged into the JSON body by the openai SDK
             stream = await self._client.chat.completions.create(**kwargs)

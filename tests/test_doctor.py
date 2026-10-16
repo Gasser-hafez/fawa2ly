@@ -46,9 +46,11 @@ def test_check_llm_skips_without_a_key_and_without_a_default_model(monkeypatch):
     assert c.status == SKIP and "default model" in c.detail
 
 
-def test_every_shipped_vendor_has_a_default_model_so_doctor_can_probe_it():
+def test_every_timed_vendor_has_a_default_model_so_doctor_can_probe_it():
+    # The vendors added 2026-10-16 have none on purpose: the user picks one from the vendor's list,
+    # and the doctor then probes that one (all_vendors carries the pick).
     from fawa2ly.llm import VENDORS
-    missing = [name for name, v in VENDORS.items() if not v.get("model")]
+    missing = [name for name in ("gemini", "groq", "cerebras", "ollama") if not VENDORS[name].get("model")]
     assert missing == [], f"these vendors cannot be health-checked: {missing}"
 
 

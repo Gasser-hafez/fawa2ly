@@ -78,7 +78,7 @@ function render(s) {
   $("cv-warning").textContent = warning;
   const chosen = live && activeVendor ? activeVendor : c.vendor;
   $("vendor").replaceChildren(...(providers.length
-    ? providers.map((p) => option(p.vendor, `${p.vendor} - ${p.model}`, p.vendor === chosen))
+    ? providers.map((p) => option(p.vendor, `${p.label || p.vendor} - ${p.model}`, p.vendor === chosen))
     : [option("", "No model has a key yet: add one under API keys", true)]));
   $("model").value = c.model || "";
   $("speculate").checked = c.speculate !== false;
@@ -90,7 +90,8 @@ function render(s) {
   $("whisper-options").hidden = !offline;
   $("whisper-missing").hidden = !(offline && c.whisper_available === false);
   renderDevices();
-  renderKeys(c.keys || {});
+  renderKeys({ DEEPGRAM_API_KEY: !!(c.keys || {}).DEEPGRAM_API_KEY });
+  renderProviders(c.provider_catalog || []);
   $("animate").checked = c.animate !== false;
   $("pace-meter").checked = c.pace_meter !== false;
   $("text-size").value = c.text_size || "medium";
@@ -867,6 +868,246 @@ $("save-keys").addEventListener("click", () => {
   }
 });
 
+/* ---------- providers (2026-10-16) ---------- */
+// One <details> card per provider, built once and then only updated, like the key rows above, so a
+// broadcast arriving while something is being typed does not wipe it. A field the user has edited
+// is marked dirty and left alone until it is saved.
+
+function provField(label, type, name, placeholder) {
+  const row = document.createElement("label");
+  row.className = "field";
+  const span = document.createElement("span");
+  span.textContent = label;
+  const input = document.createElement("input");
+  input.type = type;
+  input.spellcheck = false;
+  input.autocomplete = "off";
+  input.dataset.name = name;
+  if (placeholder) input.placeholder = placeholder;
+  input.addEventListener("input", () => { input.dataset.dirty = "1"; });
+  row.append(span, input);
+  return row;
+}
+
+function provButton(text, primary, onClick) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = text;
+  if (primary) b.className = "primary";
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+function provState(p) {
+  if (!p.enabled) return ["", "Off"];
+  if (!p.key_optional && !p.key_set) return ["", "Needs a key"];
+  if (!p.model) return ["partial", "Pick a model"];
+  return ["ready", "Ready"];
+}
+
+function setResult(card, text, kind) {
+  const r = card.querySelector(".prov-result");
+  r.textContent = text;
+  r.className = `prov-result ${kind || ""}`;
+}
+
+function buildProvider(p) {
+  const card = document.createElement("details");
+  card.className = "prov";
+  card.id = `prov-${p.id}`;
+  const head = document.createElement("summary");
+  const dot = document.createElement("span");
+  dot.className = "prov-dot";
+  const name = document.createElement("span");
+  name.className = "prov-name";
+  name.setAttribute("translate", "no");
+  const state = document.createElement("span");
+  state.className = "prov-state";
+  head.append(dot, name, state);
+
+  const body = document.createElement("div");
+  body.className = "prov-body";
+  const use = document.createElement("label");
+  use.className = "check";
+  const useBox = document.createElement("input");
+  useBox.type = "checkbox";
+  useBox.dataset.name = "enabled";
+  useBox.addEventListener("change", () => send("provider_save", { vendor: p.id, values: { enabled: useBox.checked } }));
+  const useText = document.createElement("span");
+  useText.textContent = "Offer this provider in the model list";
+  use.append(useBox, useText);
+  body.append(use);
+
+  if (p.key_env) {
+    const keyRow = document.createElement("div");
+    keyRow.className = "row2";
+    const keyField = provField("Key", "password", "key", "");
+    keyRow.append(keyField);
+    body.append(keyRow);
+  }
+  const where = document.createElement("div");
+  where.className = "row2";
+  where.append(provField("Address", "text", "base_url", ""), provField("Temperature", "text", "temperature", ""));
+  body.append(where);
+
+  const modelRow = document.createElement("div");
+  modelRow.className = "row2";
+  const modelField = provField("Model id", "text", "model", "");
+  const list = document.createElement("datalist");
+  list.id = `models-${p.id}`;
+  modelField.querySelector("input").setAttribute("list", list.id);
+  modelField.append(list);
+  const modelPick = document.createElement("label");
+  modelPick.className = "field";
+  const pickSpan = document.createElement("span");
+  pickSpan.textContent = "Models from the provider";
+  const pick = document.createElement("select");
+  pick.dataset.name = "pick";
+  pick.append(option("", "Test the connection to list them", true));
+  pick.addEventListener("change", () => {
+    if (!pick.value) return;
+    const m = card.querySelector('input[data-name="model"]');
+    m.value = pick.value;
+    m.dataset.dirty = "1";
+  });
+  modelPick.append(pickSpan, pick);
+  modelRow.append(modelField, modelPick);
+  body.append(modelRow);
+
+  const actions = document.createElement("div");
+  actions.className = "actions";
+  actions.append(
+    provButton("Save", true, () => saveProvider(p.id)),
+    provButton("Test connection", false, () => {
+      setResult(card, "Checking...");
+      send("provider_check", { vendor: p.id });
+    }),
+  );
+  if (p.key_env) {
+    actions.append(provButton("Remove key", false, () => {
+      if (send("keys", { values: { [p.key_env]: "" } })) flash("Key removed");
+    }));
+  }
+  if (p.kind === "custom") {
+    actions.append(provButton("Remove endpoint", false, () => {
+      if (confirm(`Remove ${p.label} and its key?`)) send("provider_remove", { vendor: p.id });
+    }));
+  }
+  body.append(actions);
+  const result = document.createElement("p");
+  result.className = "prov-result";
+  result.setAttribute("aria-live", "polite");
+  body.append(result);
+
+  card.append(head, body);
+  return card;
+}
+
+function updateProvider(card, p) {
+  const [dotClass, stateText] = provState(p);
+  card.querySelector(".prov-dot").className = `prov-dot ${dotClass}`;
+  card.querySelector(".prov-name").textContent = p.label;
+  card.querySelector(".prov-state").textContent = stateText;
+  card.querySelector('input[data-name="enabled"]').checked = p.enabled;
+  const set = (name, value, placeholder) => {
+    const input = card.querySelector(`input[data-name="${name}"]`);
+    if (!input) return;
+    if (placeholder !== undefined) input.placeholder = placeholder;
+    if (input.dataset.dirty || document.activeElement === input) return;
+    input.value = value;
+  };
+  set("base_url", p.base_url === p.default_base_url ? "" : p.base_url, p.default_base_url || p.base_url);
+  set("model", p.model === p.default_model ? "" : p.model,
+      p.default_model ? `Default: ${p.default_model}` : "Pick or type a model id");
+  set("temperature", p.temperature == null ? "" : String(p.temperature), "Provider default");
+  set("key", "", p.key_set ? "Set. Paste a new key to replace it" : p.key_optional ? "Optional" : "Paste the key");
+}
+
+function renderProviders(catalog) {
+  const boxes = { local: $("prov-local"), cloud: $("prov-cloud"), custom: $("prov-custom") };
+  const seen = new Set();
+  for (const p of catalog) {
+    seen.add(`prov-${p.id}`);
+    let card = document.getElementById(`prov-${p.id}`);
+    if (!card) {
+      card = buildProvider(p);
+      boxes[p.kind].append(card);
+    }
+    updateProvider(card, p);
+  }
+  for (const box of Object.values(boxes)) {
+    for (const card of [...box.children]) if (!seen.has(card.id)) card.remove();
+  }
+}
+
+function saveProvider(id) {
+  const card = $(`prov-${id}`);
+  const values = {};
+  for (const name of ["base_url", "model", "temperature"]) {
+    const input = card.querySelector(`input[data-name="${name}"]`);
+    if (input && input.dataset.dirty) values[name] = input.value.trim();
+  }
+  const keyInput = card.querySelector('input[data-name="key"]');
+  const key = keyInput ? keyInput.value.trim() : "";
+  const p = (current.provider_catalog || []).find((x) => x.id === id);
+  if (key && p && p.key_env) send("keys", { values: { [p.key_env]: key } });
+  if (Object.keys(values).length && !send("provider_save", { vendor: id, values })) return;
+  if (!key && !Object.keys(values).length) {
+    flash("Nothing changed");
+    return;
+  }
+  for (const input of card.querySelectorAll("input[data-dirty]")) delete input.dataset.dirty;
+  if (keyInput) keyInput.value = "";                      // a key does not stay on screen
+  flash(nextCall());
+}
+
+function onProviderCheck(e) {
+  const card = $(`prov-${e.vendor}`);
+  if (!card) return;
+  if (!e.ok) {
+    setResult(card, `Could not connect: ${e.error}`, "err");
+    return;
+  }
+  const models = e.models || [];
+  const list = $(`models-${e.vendor}`);
+  list.replaceChildren(...models.map((m) => option(m, m, false)));
+  const pick = card.querySelector('select[data-name="pick"]');
+  pick.replaceChildren(option("", models.length ? `${models.length} models: choose one` : "The provider listed no models", true),
+    ...models.map((m) => option(m, m, false)));
+  setResult(card, `Connected in ${e.ms} ms.`, "ok");
+}
+
+function onScanLocal(e) {
+  const found = (e.results || []).filter((r) => r.ok);
+  for (const r of e.results || []) onProviderCheck(r.ok ? r : { ...r, error: "nothing is listening at that address" });
+  $("scan-status").textContent = found.length
+    ? `Found: ${found.map((r) => labelOf(r.vendor)).join(", ")}. Turned on.`
+    : "No local model server answered. Start one (for example Ollama or LM Studio), then scan again.";
+  $("scan-local").disabled = false;
+}
+
+const labelOf = (id) => ((current.provider_catalog || []).find((p) => p.id === id) || { label: id }).label;
+
+$("scan-local").addEventListener("click", () => {
+  if (!send("scan_local")) return;
+  $("scan-local").disabled = true;
+  $("scan-status").textContent = "Scanning...";
+});
+
+$("add-endpoint-btn").addEventListener("click", () => {
+  const values = { label: $("new-label").value.trim(), base_url: $("new-url").value.trim(),
+                   model: $("new-model").value.trim(), key: $("new-key").value.trim() };
+  if (!values.label || !values.base_url) {
+    flash("Give the endpoint a name and an address");
+    return;
+  }
+  if (send("provider_add", { values })) {
+    for (const id of ["new-label", "new-url", "new-model", "new-key"]) $(id).value = "";
+    $("add-endpoint").open = false;
+    flash("Endpoint added. Open it to test the connection.");
+  }
+});
+
 /* ---------- documents (roadmap item 5) ---------- */
 
 function documentRow(d, mode) {
@@ -942,6 +1183,12 @@ function handle(e) {
       return;
     case "usage":
       onUsage(e);
+      return;
+    case "provider_check":
+      onProviderCheck(e);
+      return;
+    case "scan_local":
+      onScanLocal(e);
       return;
     case "error":
       if (analyzing) {

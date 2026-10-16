@@ -30,7 +30,8 @@ from typing import Optional
 
 from .context import ContextBuilder, Preset, available, filter_bullets, load_cv
 from .console import safe_console
-from .llm import VENDORS, FakeLLM, OpenAICompatibleLLM, collect, mute_asyncgen_close_noise
+from .llm import FakeLLM, OpenAICompatibleLLM, collect, mute_asyncgen_close_noise
+from .llm.openai_compat import all_vendors
 from .pipeline import Pipeline
 from .stt import FakeSTT
 
@@ -68,7 +69,9 @@ class Check:
 
 def check_config() -> list[Check]:
     out = []
-    for vendor, v in VENDORS.items():
+    for vendor, v in all_vendors().items():
+        if not v.get("enabled"):
+            continue                     # turned off in Settings, or a local server never turned on
         env = v.get("key_env")
         if not env:
             out.append(Check("config", f"{vendor} key", OK, "no key needed"))
@@ -210,7 +213,7 @@ async def check_stt(seconds: float = 1.0, timeout: float = 25.0) -> Check:
 
 
 async def check_llm(vendor: str, timeout: float = 60.0) -> Check:
-    v = VENDORS[vendor]
+    v = all_vendors()[vendor]
     env = v.get("key_env")
     if env and not os.environ.get(env) and not v.get("key_optional"):
         return Check("llm", vendor, SKIP, f"{env} not set")
@@ -254,7 +257,7 @@ async def run(a) -> int:
     checks += check_whisper()
     if not a.offline:
         checks.append(await check_stt())
-        vendors = [a.vendor] if a.vendor else list(VENDORS)
+        vendors = [a.vendor] if a.vendor else [n for n, v in all_vendors().items() if v.get("enabled")]
         for vendor in vendors:
             checks.append(await check_llm(vendor))
     for c in checks:
