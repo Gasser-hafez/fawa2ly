@@ -1,4 +1,4 @@
-# -*- mode: python ; coding: utf-8 -*-
+﻿# -*- mode: python ; coding: utf-8 -*-
 # The packaged engine. Generated with pyi-makespec 6.6.0, then every path
 # anchored to this file's folder (SPECPATH), so the build does not depend on the directory it is
 # run from. Build from the project folder:
@@ -27,7 +27,7 @@ a = Analysis(
     hiddenimports=["pyaudiowpatch", "pypdf", "docx", "dotenv", "yaml",
                    # offline transcription, imported inside functions
                    "faster_whisper", "webrtcvad", "onnxruntime"],
-    hookspath=[],
+    hookspath=[os.path.join(SPECPATH, "hooks")],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],

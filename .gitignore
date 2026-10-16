@@ -18,3 +18,5 @@ cv.pdf
 # output, rebuilt from the spec, never committed.
 build/
 dist/
+
+.venv/
