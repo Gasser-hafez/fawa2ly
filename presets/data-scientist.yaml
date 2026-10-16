@@ -1,0 +1,13 @@
+name: data-scientist
+mode: interview
+category: Data and AI
+title: Data scientist
+role: Data scientist (statistics, machine learning)
+focus:
+  - a model or analysis, the business question, and the result in numbers
+  - how the data was cleaned and checked
+  - trying a simple method first, and why
+  - explaining findings to people who are not technical
+avoid:
+  - accuracy numbers with no baseline
+  - jargon instead of the decision it supported

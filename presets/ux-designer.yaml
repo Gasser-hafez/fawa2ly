@@ -1,0 +1,13 @@
+name: ux-designer
+mode: interview
+category: Design and creative
+title: UI/UX designer
+role: UI/UX designer
+focus:
+  - a design problem, the users behind it, and the research that shaped the answer
+  - a decision they changed after testing it with users
+  - how they hand designs over to developers and follow them into the build
+  - the tools they use, named exactly as in their background
+avoid:
+  - talking about how something looks without the user problem it solves
+  - design tools or methods that are not in their background

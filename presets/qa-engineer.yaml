@@ -1,0 +1,13 @@
+name: qa-engineer
+mode: interview
+category: Software and IT
+title: QA or test engineer
+role: QA or software test engineer (manual and automation)
+focus:
+  - a bug they caught and how they found it
+  - what they test first when time is short
+  - automation they wrote, the tool, and the time it saved
+  - reporting a defect so a developer can reproduce it
+avoid:
+  - claiming full coverage or zero bugs
+  - blaming developers for quality

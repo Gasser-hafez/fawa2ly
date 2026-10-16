@@ -1,0 +1,13 @@
+name: electrical-engineer
+mode: interview
+category: Engineering
+title: Electrical engineer
+role: Electrical or power engineer
+focus:
+  - a system they designed, installed or maintained
+  - a fault and how it was diagnosed
+  - standards and safety procedures
+  - working with contractors and clients
+avoid:
+  - unsafe practices
+  - theory with no practical example

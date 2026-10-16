@@ -1,0 +1,13 @@
+name: game-developer
+mode: interview
+category: Software and IT
+title: Game developer
+role: Game developer (Unity, Unreal or similar)
+focus:
+  - a game or feature they shipped and their part in it
+  - a performance or gameplay problem and the fix
+  - working with artists and designers
+  - playtest feedback they acted on
+avoid:
+  - talking only about playing games
+  - engine names with no example

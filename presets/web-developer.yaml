@@ -1,0 +1,13 @@
+name: web-developer
+mode: interview
+category: Software and IT
+title: Web developer
+role: Web developer (frontend or full stack)
+focus:
+  - a feature they built end to end, and the hardest part of it
+  - framework, API and database choices named as in their background
+  - a performance, accessibility or production bug they fixed
+  - how they work with design and code review
+avoid:
+  - frameworks or libraries that are not in their background
+  - owning a whole product that a team built

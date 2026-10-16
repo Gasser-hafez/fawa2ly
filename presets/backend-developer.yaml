@@ -1,0 +1,13 @@
+name: backend-developer
+mode: interview
+category: Software and IT
+title: Backend developer
+role: Backend developer (APIs, databases, services)
+focus:
+  - an API or service they built, its load and its data
+  - a slow query or bottleneck they measured and fixed
+  - how they handle errors, security and data consistency
+  - tests and code review habits
+avoid:
+  - framework names with no problem they solved
+  - scale they did not actually run

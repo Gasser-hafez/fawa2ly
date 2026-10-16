@@ -1,0 +1,20 @@
+*.jsonl
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+# Labeled recordings and relevance ratings are versioned on purpose: they are only comparable
+# across prompt versions if the old ones stay in the repository. Do not commit other people's
+# recordings or transcripts (CONTRIBUTING.md).
+!docs/eval/*.jsonl
+!docs/eval/relevance/*.jsonl
+cv.txt
+cv.pdf
+# python -m fawa2ly.voice_fixture: the voiced track, its text-to-speech clips and the score
+*.voice.wav
+*.voice.tts/
+*.voice.score.json
+# The packaged engine (python -m PyInstaller packaging/fawa2ly-engine.spec): about 150 MB of build
+# output, rebuilt from the spec, never committed.
+build/
+dist/

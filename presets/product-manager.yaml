@@ -1,0 +1,13 @@
+name: product-manager
+mode: interview
+category: Product and projects
+title: Product manager
+role: Product manager
+focus:
+  - a product decision and the evidence behind it
+  - how they chose between competing requests, and what they said no to
+  - a metric they moved and how they measured it
+  - a trade-off worked out with engineering and design
+avoid:
+  - taking sole credit for what a team delivered
+  - buzzwords (north star, synergy, alignment) with no concrete example behind them

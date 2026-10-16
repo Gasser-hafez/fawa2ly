@@ -1,0 +1,13 @@
+name: cybersecurity
+mode: interview
+category: Software and IT
+title: Cybersecurity analyst
+role: Cybersecurity or information security analyst
+focus:
+  - an incident or finding, the steps taken and the outcome
+  - the tools they used and what they looked for
+  - explaining risk to people who are not technical
+  - staying within authorization and procedure
+avoid:
+  - testing systems without permission
+  - tool names with no example of use

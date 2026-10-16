@@ -1,0 +1,14 @@
+name: mobile
+mode: interview
+category: Software and IT
+title: Mobile developer (Flutter)
+role: Mobile app developer (Flutter), early career
+focus:
+  - a specific app they built and the feature that was hard in it
+  - the Firebase or platform service involved, named exactly
+  - a number or limit they hit (offline sync, payments, list size, latency)
+  - what broke and the change they made after
+  - honest scope: what they have shipped versus what they have only read about
+avoid:
+  - frameworks or services that are not in their background
+  - claiming production scale they have not worked at

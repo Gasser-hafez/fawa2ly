@@ -1,0 +1,13 @@
+name: swe
+mode: interview
+category: Software and IT
+title: Software engineer
+role: Software engineer
+focus:
+  - systems, languages and tools they have actually shipped with
+  - scale or impact numbers they can quote (users, latency, cost, team size)
+  - a trade-off they weighed and why they chose that side
+  - something that broke and what they changed afterwards
+avoid:
+  - technologies that are not in their background
+  - praise for teamwork with no specific example behind it

@@ -1,0 +1,13 @@
+name: ml-engineer
+mode: interview
+category: Data and AI
+title: Machine learning or AI engineer
+role: Machine learning or AI engineer (models, LLMs, deployment)
+focus:
+  - a model or AI feature taken to production and how it is served
+  - evaluation, monitoring and the cases where it fails
+  - cost and latency trade-offs
+  - data privacy
+avoid:
+  - demos presented as production systems
+  - AI hype with no measured result

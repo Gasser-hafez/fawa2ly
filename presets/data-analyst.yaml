@@ -1,0 +1,13 @@
+name: data-analyst
+mode: interview
+category: Data and AI
+title: Data analyst
+role: Data analyst (SQL, spreadsheets, dashboards)
+focus:
+  - a question they answered with data, and the decision it changed
+  - the query, tool or model they used, named exactly as in their background
+  - how they checked that the numbers were right before sharing them
+  - how they explained a result to someone who is not technical
+avoid:
+  - statistics methods or tools that are not in their background
+  - business impact they cannot put a number or an example to

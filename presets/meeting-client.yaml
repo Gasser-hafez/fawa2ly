@@ -1,0 +1,12 @@
+name: meeting-client
+mode: meeting
+category: General
+title: Client meeting
+role: Consultant or account lead in a meeting with a client
+focus:
+  - the goal behind what the client asked
+  - status, scope and next steps stated plainly
+  - what will be confirmed after the meeting
+avoid:
+  - scope, prices or dates that were not agreed
+  - blaming the team or the client

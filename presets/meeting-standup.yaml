@@ -1,0 +1,12 @@
+name: meeting-standup
+mode: meeting
+category: General
+title: Team standup
+role: Team member giving and discussing updates in a daily standup
+focus:
+  - what they finished, what they are doing next, and what blocks them
+  - one short fact per update, not the whole story
+  - the help that would unblock them
+avoid:
+  - dates or estimates they have not given themselves
+  - detail that belongs after the standup

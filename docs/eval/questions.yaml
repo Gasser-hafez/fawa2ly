@@ -1,0 +1,56 @@
+# Relevance eval set.
+#
+# Every question a prompt change has to keep answering well. Grouped by preset so a change can
+# be judged per domain, not just on average: a prompt that helps the mobile interview and ruins
+# the meeting has not improved anything.
+#
+# Sources, so the set stays honest rather than convenient:
+#   script     from docs/eval/scripts/*.yaml, written to match the CV's domain
+#   standard   the questions every screening interview asks
+#
+# Add to this file rather than replacing it. Scores are only comparable across prompt versions
+# when the questions stay the same.
+
+mobile:
+  - text: "So, tell me a little bit about yourself and what you've been working on."
+    source: script
+  - text: "Why Flutter specifically, rather than native Android or React Native?"
+    source: script
+  - text: "Walk me through the state management in one of those apps. What did you use and why?"
+    source: script
+  - text: "Can you tell me about a time something broke in one of your apps and how you dealt with it?"
+    source: script
+  - text: "And how did you test that? Did you write tests for it, or was it manual?"
+    source: script
+  - text: "You mentioned a Laravel internship at Acme Tax. What did you actually build there?"
+    source: script
+  - text: "So how comfortable would you say you are on the backend side, honestly?"
+    source: script
+  - text: "Suppose the app has to work with no connection for a whole day and sync afterwards. How would you approach that?"
+    source: script
+  - text: "How would you keep a list of ten thousand items smooth on a mid-range Android phone?"
+    source: standard
+  - text: "What would you do differently if you rebuilt your e-commerce app today?"
+    source: standard
+
+hr:
+  - text: "What is your biggest weakness?"
+    source: standard
+  - text: "Why did you leave your last job?"
+    source: standard
+  - text: "Where do you see yourself in five years specifically within our company?"
+    source: standard
+  - text: "Why do you think that our company should hire you specifically amongst our pool of candidates?"
+    source: standard
+  - text: "Can you tell me about a challenge or a conflict that you've faced in the workplace and how you dealt with it?"
+    source: standard
+  - text: "To date, what would you say is your greatest professional achievement?"
+    source: standard
+  - text: "Are you interviewing currently with any other companies?"
+    source: standard
+  - text: "What salary range would you be most comfortable with?"
+    source: standard
+  - text: "Do you prefer working alone or as part of a team?"
+    source: standard
+  - text: "Do you have any questions for us?"
+    source: standard

@@ -1,0 +1,72 @@
+name: Release
+
+# Pushing a tag such as v0.1.0 builds the Windows installer and publishes it as a GitHub release.
+# Run it by hand (Actions > Release > Run workflow) to build the installer without publishing.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+
+      # Nothing is built from a tree whose tests fail.
+      - run: python -m pytest -q
+
+      # The engine, frozen. Then the same health check a user can run from the install folder:
+      # it is how a library whose binary was not collected shows up before a user finds it.
+      - run: python -m PyInstaller packaging/fawa2ly-engine.spec --noconfirm
+      - run: dist/fawa2ly-engine/fawa2ly-engine.exe doctor --offline
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      - run: npm ci
+        working-directory: app
+      - run: npx tauri build --config src-tauri/tauri.bundle.json
+        working-directory: app
+
+      - name: Checksum
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem app/src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          if (-not $setup) { throw "no installer was produced" }
+          $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLower()
+          "$hash  $($setup.Name)" | Out-File -Encoding ascii "$($setup.FullName).sha256"
+          "SETUP=$($setup.FullName)" | Out-File -Append -Encoding ascii $env:GITHUB_ENV
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fawa2ly-windows-installer
+          path: |
+            ${{ env.SETUP }}
+            ${{ env.SETUP }}.sha256
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Fawa2ly ${{ github.ref_name }}
+          body_path: CHANGELOG.md
+          prerelease: true          # until someone outside the author has installed it
+          files: |
+            ${{ env.SETUP }}
+            ${{ env.SETUP }}.sha256

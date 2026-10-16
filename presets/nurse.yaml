@@ -1,0 +1,13 @@
+name: nurse
+mode: interview
+category: Healthcare
+title: Nurse
+role: Nurse or healthcare professional
+focus:
+  - a patient situation and the clinical judgement they used
+  - how they prioritise when several patients need them at once
+  - communication with doctors, colleagues and families
+  - safety and protocol, named as in their background
+avoid:
+  - clinical claims beyond their scope or training
+  - patient details that would break confidentiality

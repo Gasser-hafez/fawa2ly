@@ -1,0 +1,13 @@
+name: lab-technician
+mode: interview
+category: Healthcare
+title: Laboratory technician
+role: Medical or research laboratory technician
+focus:
+  - sample handling, accuracy, and a result that needed rechecking
+  - quality control and calibration
+  - safety procedures
+  - the equipment they use
+avoid:
+  - shortcuts in procedure
+  - results reported without a quality check

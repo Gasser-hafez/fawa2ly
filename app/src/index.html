@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fawa2ly</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="i18n.js"></script>
+  </head>
+  <body>
+    <div id="panel" data-state="connecting">
+      <header id="titlebar" data-tauri-drag-region>
+        <span class="grip" data-tauri-drag-region><i></i><i></i></span>
+        <span class="wordmark" data-tauri-drag-region>Fawa2ly</span>
+        <span class="spacer" data-tauri-drag-region></span>
+        <button id="open-settings" class="icon" type="button" title="Settings">&#9881;</button>
+        <button id="hide" class="icon" type="button" title="Hide the window (Ctrl+Shift+P shows it again)">&#8211;</button>
+        <button id="close" type="button" title="Close">&#10005;</button>
+      </header>
+
+      <div id="status">
+        <span id="dot"></span>
+        <span id="state">Connecting to engine</span>
+        <span id="no-cv" class="badge warn" hidden title="No background document is loaded: answers cannot use your experience">No CV</span>
+        <span id="click-through" class="badge" hidden title="Clicks go to the window underneath">Click-through: Ctrl+Shift+L</span>
+        <span id="pace" class="pace" hidden title="Your speaking pace over your last 40 words, and filler words so far"></span>
+        <span class="spacer"></span>
+        <span id="provider"></span>
+        <select id="provider-pick" title="Switch model for the next question" hidden></select>
+        <button id="pause" type="button" disabled>Pause</button>
+        <button id="end" type="button" hidden>End</button>
+      </div>
+
+      <main id="body">
+        <div id="call-actions" class="actions call-actions" hidden>
+          <button type="button" id="act-say" title="Lines to say next, without waiting for a question">What should I say?</button>
+          <button type="button" id="act-recap" title="The conversation so far, to catch up">Recap</button>
+          <button type="button" id="act-ask" title="Questions you could ask the other side">Questions to ask</button>
+        </div>
+        <section id="notice" class="notice">
+          <h1 id="notice-title">Fawa2ly cannot hear the call yet.</h1>
+          <p id="notice-text">Waiting on the local engine. Nothing will be suggested until this connects.</p>
+          <p id="notice-note" class="notice-note" hidden></p>
+          <div class="bar"><i></i></div>
+          <div class="actions" id="notice-actions" hidden>
+            <button type="button" class="primary" id="reconnect" hidden>Reconnect</button>
+            <button type="button" class="primary" id="new-call" hidden>New call</button>
+            <button type="button" id="review-call" hidden>Review this call</button>
+          </div>
+        </section>
+
+        <section id="setup" hidden>
+          <h1>Set up this call</h1>
+
+          <label class="field">
+            <span>Call</span>
+            <select id="mode">
+              <option value="interview">Interview</option>
+              <option value="meeting">Meeting</option>
+            </select>
+          </label>
+
+          <div class="field">
+            <span>Role</span>
+            <div class="role-current">
+              <span id="role-name">No role</span>
+              <button type="button" id="change-role">Change in Settings</button>
+            </div>
+          </div>
+
+          <label class="field">
+            <span>Language</span>
+            <select id="lang">
+              <option value="en">English</option>
+              <option value="ar-EG">Arabic, Egyptian</option>
+              <option value="ar">Arabic</option>
+              <option value="multi">Auto: English and 9 other languages, no Arabic</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Model</span>
+            <select id="vendor"></select>
+          </label>
+
+          <label class="check">
+            <input type="checkbox" id="speculate" checked />
+            <span>Ask the model early: faster, but more requests (off for rate-limited free tiers)</span>
+          </label>
+
+          <label class="field">
+            <span>Answers</span>
+            <select id="style">
+              <option value="full">Full lines to say</option>
+              <option value="keywords">Keywords only</option>
+              <option value="direction">Direction: how to shape the answer</option>
+              <option value="dynamic">Dynamic: pick the best of the three per question</option>
+            </select>
+          </label>
+
+          <label class="check">
+            <input type="checkbox" id="user-mic" />
+            <span>Also transcribe my microphone, for context</span>
+          </label>
+
+          <div class="field cv">
+            <span id="cv-label">Your background</span>
+            <ul id="docs" class="docs"></ul>
+            <p id="cv-state" class="cv-state">No document. Suggestions will be general.</p>
+            <p id="cv-warning" class="warning" hidden>No CV loaded. The model cannot use your experience, and every answer will be generic.</p>
+            <div class="actions">
+              <button type="button" id="pick-cv">Choose files</button>
+              <button type="button" id="drop-cv" hidden>Remove all</button>
+            </div>
+            <input type="file" id="cv-file" accept=".txt,.md,.pdf,.docx" multiple hidden />
+          </div>
+
+          <div class="actions start">
+            <button type="button" class="primary" id="start">Start listening</button>
+          </div>
+          <p id="setup-error" class="error" hidden></p>
+        </section>
+
+        <section id="current" data-phase="waiting" hidden>
+          <div class="head">
+            <div class="head-row">
+              <p class="label" id="asked-label">Asked</p>
+              <span id="style-badge" class="style-badge" hidden title="The shape Dynamic chose for this answer"></span>
+              <span class="spacer"></span>
+              <span class="nav" id="nav" hidden>
+                <button type="button" id="prev" title="Previous question (Left arrow)">&#8249;</button>
+                <span id="pos"></span>
+                <button type="button" id="next" title="Next question (Right arrow)">&#8250;</button>
+                <button type="button" id="latest" hidden>Latest</button>
+              </span>
+            </div>
+            <p id="question" dir="auto" translate="no"></p>
+            <div class="bar"><i></i></div>
+          </div>
+          <div id="skeleton"><div></div><div></div><div></div></div>
+          <ol id="lines" translate="no"></ol>
+          <div id="writing"><i></i><span>writing the next line</span></div>
+          <div class="actions more"><button type="button" id="more" hidden>More on this</button><button type="button" id="shorter" hidden title="The same answer in fewer, shorter lines">Shorter</button></div>
+          <div id="feedback" class="feedback" hidden><span id="feedback-verdict" class="fb-verdict"></span><span id="feedback-note" class="fb-note" translate="no" dir="auto"></span></div>
+          <div id="failure">
+            <h2 id="failure-title">No lines for this one.</h2>
+            <p id="failure-text">Keep talking, earlier answers are still below.</p>
+            <div class="actions"><button type="button" id="retry">Retry</button></div>
+          </div>
+        </section>
+
+        <section id="earlier" hidden>
+          <p class="label" id="earlier-label">Earlier</p>
+          <ul id="earlier-list"></ul>
+        </section>
+      </main>
+
+      <footer id="caption"><i></i><span id="caption-text" class="muted" dir="auto">no audio</span></footer>
+    </div>
+
+    <script src="chrome.js"></script>
+    <script type="module" src="main.js"></script>
+  </body>
+</html>

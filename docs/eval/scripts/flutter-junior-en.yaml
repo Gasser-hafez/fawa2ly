@@ -1,0 +1,115 @@
+name: flutter-junior-en
+preset: mobile
+note: >
+  Junior Flutter / mobile developer screening interview, written to match sample_cv.pdf
+  (Flutter, Firebase, Laravel internship, final-year IT student). Speech patterns copied from
+  the real recordings: interviewers front-load filler ("So", "Okay, great"), tack the name on
+  the end, restate a question mid-sentence, and start the next question before the candidate has
+  finished. Candidate answers are deliberately ordinary, because the point of the fixture is the
+  interviewer's timing, not the answer quality.
+
+turns:
+  - who: interviewer
+    text: "Hi Sam, thanks for making the time today. I'm Nour, I lead the mobile team here."
+  - who: candidate
+    text: "Thanks for having me, nice to meet you."
+    pause: 0.4
+
+  - who: interviewer
+    text: "So, tell me a little bit about yourself and what you've been working on."
+    pause: 0.5
+  - who: candidate
+    text: >
+      Sure. I'm in my final year of Information Technology at a local university, and most of my work has been
+      Flutter apps backed by Firebase. I built an e-commerce app with authentication, product
+      browsing and Stripe payments, and a real-time chat app with offline queuing.
+    pause: 0.3
+
+  - who: interviewer
+    text: "Okay, great. Why Flutter specifically, rather than native Android or React Native?"
+    pause: 0.25
+  - who: candidate
+    text: >
+      Mostly one codebase for both platforms, and the widget model made it fast for me to iterate
+      on UI. I also found the tooling straightforward coming from a student project setup.
+    pause: 0.3
+
+  - who: interviewer
+    text: >
+      Right. Walk me through the state management in one of those apps. What did you use and why?
+    pause: 0.4
+  - who: candidate
+    text: >
+      In the task manager I used Riverpod, mainly because I wanted the logic testable outside the
+      widget tree. Earlier projects used Provider and it got harder to follow as screens grew.
+    pause: 0.3
+
+  - who: interviewer
+    text: >
+      Can you tell me about a time something broke in one of your apps and how you dealt with it?
+    pause: 0.5
+  - who: candidate
+    text: >
+      The chat app dropped messages when the phone lost signal mid-send. I added an offline queue
+      so messages persist locally and retry on reconnect, and made the send path idempotent.
+    pause: 0.3
+
+  - who: interviewer
+    text: "And how did you test that? Did you write tests for it, or was it manual?"
+    pause: 0.25
+  - who: candidate
+    text: >
+      Mostly manual at first, toggling airplane mode. Later I added unit tests around the queue
+      itself, though the Firebase parts I still tested by hand.
+    pause: 0.4
+
+  - who: interviewer
+    text: >
+      Understood. You mentioned a Laravel internship at Acme Tax. What did you actually build there?
+    pause: 0.3
+  - who: candidate
+    text: >
+      I worked on an e-invoicing platform, mostly inside the Laravel MVC stack. Routing, Eloquent
+      models, Blade views, and I handled some MySQL schema migrations for a new table.
+    pause: 0.35
+
+  - who: interviewer
+    text: "So how comfortable would you say you are on the backend side, honestly?"
+    pause: 0.25
+  - who: candidate
+    text: >
+      Honestly, comfortable reading and extending existing code, less so designing a schema from
+      nothing. That's part of why I'm looking for a role with backend exposure.
+    pause: 0.4
+
+  - who: interviewer
+    text: "What would you say is your biggest weakness as a developer right now?"
+    pause: 0.5
+  - who: candidate
+    text: >
+      I tend to keep polishing UI details past the point where it matters. I've started setting a
+      cutoff and moving on to the next feature.
+    pause: 0.3
+
+  - who: interviewer
+    text: >
+      Okay. Suppose the app has to work with no connection for a whole day and sync afterwards.
+      How would you approach that?
+    pause: 0.45
+  - who: candidate
+    text: >
+      I'd keep a local source of truth, queue the writes with timestamps, and reconcile on
+      reconnect. Conflicts are the hard part, I'd need a rule for which write wins.
+    pause: 0.3
+
+  - who: interviewer
+    text: "Do you have any questions for us, Sam?"
+    pause: 0.6
+  - who: candidate
+    text: "Yes. How is the mobile team structured, and who would I be working with day to day?"
+    pause: 0.3
+
+  - who: interviewer
+    text: >
+      Good question. It's four engineers and a designer, and you'd pair with a senior for the
+      first couple of months. Thanks Sam, we'll be in touch this week.

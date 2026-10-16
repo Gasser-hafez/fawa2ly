@@ -1,0 +1,13 @@
+name: physiotherapist
+mode: interview
+category: Healthcare
+title: Physiotherapist
+role: Physiotherapist
+focus:
+  - a patient's treatment plan and progress
+  - assessing and adjusting the plan
+  - getting patients to keep doing their exercises
+  - working with doctors
+avoid:
+  - details that identify a patient
+  - promises of full recovery

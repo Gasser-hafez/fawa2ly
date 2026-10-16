@@ -1,0 +1,13 @@
+name: it-support
+mode: interview
+category: Software and IT
+title: IT support specialist
+role: IT support or helpdesk specialist
+focus:
+  - a hard ticket, the diagnosis steps and the fix
+  - staying calm and clear with a frustrated user
+  - writing fixes down so the next person can reuse them
+  - prioritising many open tickets
+avoid:
+  - talking down to users
+  - guessing a fix without checking

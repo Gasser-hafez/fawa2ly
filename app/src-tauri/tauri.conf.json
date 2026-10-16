@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Fawa2ly",
+  "version": "0.1.0",
+  "identifier": "com.fawa2ly.overlay",
+  "build": {
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Fawa2ly",
+        "width": 460,
+        "height": 540,
+        "alwaysOnTop": true,
+        "transparent": true,
+        "decorations": false,
+        "shadow": false,
+        "resizable": true,
+        "maximizable": false,
+        "skipTaskbar": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

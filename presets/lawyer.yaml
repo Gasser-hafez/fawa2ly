@@ -1,0 +1,13 @@
+name: lawyer
+mode: interview
+category: Business, finance and law
+title: Lawyer or legal counsel
+role: Lawyer, legal counsel or paralegal
+focus:
+  - a case or contract they worked on and their exact part
+  - legal research and how it changed the advice
+  - explaining legal risk in plain words
+  - confidentiality and ethics
+avoid:
+  - client details
+  - certainty about how a case will end

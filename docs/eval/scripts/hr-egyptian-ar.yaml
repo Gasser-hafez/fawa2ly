@@ -1,0 +1,147 @@
+name: hr-egyptian-ar
+preset: graduate
+note: >
+  Egyptian Arabic screening interview with English terms mixed in, the way a Cairo interviewer
+  actually talks. Written to find out why Arabic questions went unanswered in rehearsal8: Deepgram's
+  ar-EG model returns almost no punctuation (4 of 17 finals, none in Egyptian speech), so a question
+  reaches the detector as one unpunctuated turn, often with the request in the middle ("حلو جدا يا
+  كريم بما انك بدات تهتم بمجال الاتش ار ممكن تحكي لي ايه اول تجربه"). Every interviewer turn
+  carries `expect`: question (must be answered), statement (must not be), fragment (the first half
+  of a question split by a long pause; either outcome is acceptable, the second half must fire).
+  Shapes covered: request opener at the start and after a lead-in, question word at the end
+  ("عامل إيه"), in the middle ("شايف نفسك فين"), a yes/no question with no question word
+  ("عندك أي experience"), an "X ولا Y" choice, a fully English question inside the Arabic call,
+  and statements that contain question-like words ("عندنا", "لو").
+
+turns:
+  - who: interviewer
+    text: "أهلا يا كريم، إزيك؟ عامل إيه النهارده؟"
+    expect: question
+  - who: candidate
+    text: "الحمد لله تمام، شكرا إنك اديتني الفرصة."
+    pause: 0.5
+
+  - who: interviewer
+    text: "أنا نور، الـ HR manager هنا. الـ interview هتاخد حوالي نص ساعة إن شاء الله."
+    pause: 0.6
+    expect: statement
+  - who: interviewer
+    text: "تمام، خلينا نبدأ. احكيلي كده عن نفسك باختصار."
+    pause: 1.6
+    expect: question
+  - who: candidate
+    text: >
+      أنا كريم، في آخر سنة حاسبات ومعلومات، واشتغلت على كذا app بالـ Flutter والـ Firebase،
+      منهم e-commerce app و chat app.
+    pause: 0.8
+
+  - who: interviewer
+    text: "حلو جدا. إيه اللي خلاك مهتم بالـ software engineering أصلا؟"
+    pause: 0.7
+    expect: question
+  - who: candidate
+    text: "من وأنا صغير بحب أفهم الحاجات بتشتغل إزاي، ولما بدأت أبرمج حسيت إن ده مكاني."
+    pause: 0.6
+
+  - who: interviewer
+    text: "بما إنك اشتغلت على Flutter، ممكن تشرحلي الفرق بين الـ Stateless widget والـ Stateful widget؟"
+    pause: 0.8
+    expect: question
+  - who: candidate
+    text: "الـ Stateless مبيتغيرش بعد ما يترسم، إنما الـ Stateful عنده state بتتغير وبيعمل rebuild."
+    pause: 0.5
+
+  - who: interviewer
+    text: "طب لو الـ app بتاعك بقى بطيء جدا، هتعمل debugging إزاي؟"
+    pause: 0.7
+    expect: question
+  - who: candidate
+    text: "هفتح الـ DevTools وأشوف الـ performance tab، وأدور على الـ rebuilds اللي مالهاش لازمة."
+    pause: 0.6
+
+  - who: interviewer
+    text: "كلمني عن موقف واجهتك فيه مشكلة صعبة في مشروع، وحليتها إزاي."
+    pause: 0.9
+    expect: question
+  - who: candidate
+    text: "في الـ chat app الرسايل كانت بتضيع لما النت يقطع، فعملت offline queue بتبعت تاني لما النت يرجع."
+    pause: 0.6
+
+  - who: interviewer
+    text: "إنت بتستخدم state management إيه؟ Provider ولا Riverpod؟"
+    pause: 0.7
+    expect: question
+  - who: candidate
+    text: "آخر مشروع كان بالـ Riverpod، وقبله Provider."
+    pause: 0.5
+
+  - who: interviewer
+    text: "عندك أي experience مع الـ unit testing أو الـ CI/CD؟"
+    pause: 0.8
+    expect: question
+  - who: candidate
+    text: "كتبت unit tests بسيطة للـ queue، لكن الـ CI/CD لسه متعاملتش معاه في شغل حقيقي."
+    pause: 0.5
+
+  - who: interviewer
+    text: >
+      تمام، ده كويس جدا. إحنا شغالين في الـ fintech من سنة ألفين وعشرين، والـ team عندنا حوالي
+      عشرين developer.
+    pause: 0.8
+    expect: statement
+  - who: interviewer
+    text: "لو عندك deadline قريب،"
+    pause: 1.2
+    expect: fragment
+  - who: interviewer
+    text: "والـ requirements اتغيرت فجأة، هتتصرف إزاي؟"
+    pause: 1.4
+    expect: question
+  - who: candidate
+    text: "هقعد مع الـ team lead ونرتب الأولويات، ونشوف إيه اللي ممكن يتأجل."
+    pause: 0.6
+
+  - who: interviewer
+    text: "شايف نفسك فين بعد خمس سنين؟"
+    pause: 0.8
+    expect: question
+  - who: candidate
+    text: "إن شاء الله senior mobile developer، وبساعد في الـ architecture."
+    pause: 0.5
+
+  - who: interviewer
+    text: "المرتب اللي إنت متوقعه كام تقريبا؟"
+    pause: 0.9
+    expect: question
+  - who: candidate
+    text: "حسب الـ package كلها، بس في حدود المتعارف عليه للـ junior."
+    pause: 0.5
+
+  - who: interviewer
+    text: "Tell me, why should we hire you?"
+    pause: 0.8
+    expect: question
+  - who: candidate
+    text: "عشان بتعلم بسرعة، وعندي مشاريع حقيقية شغالة."
+    pause: 0.5
+
+  - who: interviewer
+    text: "تقدر تبدأ امتى لو حصل نصيب؟"
+    pause: 0.7
+    expect: question
+  - who: candidate
+    text: "بعد الامتحانات على طول، يعني أول الشهر الجاي."
+    pause: 0.5
+
+  - who: interviewer
+    text: "طيب يا كريم، عندك أي أسئلة ليا؟"
+    pause: 0.8
+    expect: question
+  - who: candidate
+    text: "أيوه، الـ team بيشتغل remote ولا من المكتب؟"
+    pause: 0.5
+
+  - who: interviewer
+    text: "ماشي، شكرا جدا يا كريم، هنبعتلك الـ feedback خلال أسبوع."
+    pause: 0.8
+    expect: statement

@@ -1,0 +1,13 @@
+name: data-engineer
+mode: interview
+category: Data and AI
+title: Data engineer
+role: Data engineer (pipelines, warehouses, ETL)
+focus:
+  - a pipeline they built, its sources, volume and schedule
+  - a data quality problem, how it was found and fixed
+  - tools such as SQL, Spark or Airflow tied to real use
+  - making data reliable for analysts
+avoid:
+  - tool lists with no pipeline
+  - ignoring data quality and monitoring

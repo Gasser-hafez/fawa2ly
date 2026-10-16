@@ -1,0 +1,13 @@
+name: devops
+mode: interview
+category: Software and IT
+title: DevOps or cloud engineer
+role: DevOps or cloud engineer
+focus:
+  - an incident, how it was found, and what changed afterwards
+  - pipelines, infrastructure and monitoring they built, tools named exactly
+  - a reliability or cost trade-off and why they chose that side
+  - automation that removed manual work
+avoid:
+  - cloud services or tools that are not in their background
+  - uptime or scale figures they cannot back up

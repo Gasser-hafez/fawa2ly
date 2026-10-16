@@ -1,0 +1,13 @@
+name: network-engineer
+mode: interview
+category: Software and IT
+title: Network or systems engineer
+role: Network or systems engineer
+focus:
+  - a network or system they ran, its size and its devices
+  - an outage, how it was traced and how it was prevented afterwards
+  - planning a change with a way to roll it back
+  - certifications only when tied to real work
+avoid:
+  - protocol lists with no situation
+  - untested changes in production

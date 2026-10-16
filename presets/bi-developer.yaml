@@ -1,0 +1,13 @@
+name: bi-developer
+mode: interview
+category: Data and AI
+title: Business intelligence developer
+role: Business intelligence or reporting developer (Power BI, Tableau)
+focus:
+  - a dashboard, who used it, and the decision it changed
+  - the data model and the measures behind the numbers
+  - gathering requirements from business users
+  - keeping reports correct and fast
+avoid:
+  - good-looking visuals with no business use
+  - numbers never checked against the source

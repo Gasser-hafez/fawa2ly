@@ -1,0 +1,13 @@
+name: doctor
+mode: interview
+category: Healthcare
+title: Doctor or physician
+role: Doctor or resident physician
+focus:
+  - a clinical case, their reasoning and the outcome, with no patient identifiers
+  - working under pressure on shifts
+  - talking with patients and families
+  - learning from a mistake or a near miss
+avoid:
+  - details that identify a patient
+  - overstating their authority or experience

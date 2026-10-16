@@ -1,0 +1,13 @@
+name: consultant
+mode: interview
+category: Business, finance and law
+title: Management consultant
+role: Management or strategy consultant
+focus:
+  - a client problem, how the analysis was structured, and the recommendation
+  - the data used and the impact in numbers
+  - handling a skeptical client
+  - reasoning out loud through a case
+avoid:
+  - frameworks recited with no insight
+  - credit for what the team achieved

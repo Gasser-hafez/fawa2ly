@@ -1,0 +1,27 @@
+Sample background document, for development only. Fictional person. Replace with your own via --cv.
+
+Sam Carter - Software engineer, Lisbon.
+
+Experience
+- Dashboard Kit (2026, side project): a small open-source library of chart components. Wrote the
+  rendering layer in TypeScript, cut first paint on a 10,000-point chart from 900 ms to 120 ms by
+  moving the layout work to a worker, and added a visual regression suite that runs on every pull
+  request.
+- Backend engineer, logistics startup (2023-2026). Python and FastAPI on Postgres. Took the
+  order search endpoint from 1.4 s to 180 ms at p95 by fixing N+1 queries and adding a
+  covering index. On call one week in four.
+- Junior developer, agency (2021-2023). Django sites for retail clients. Wrote the team's
+  first test suite after a release broke checkout on a Friday.
+
+Skills
+Python, asyncio, FastAPI, Postgres, SQLite, pytest, Docker, some Rust. English fluent,
+Arabic native.
+
+Education
+BSc Computer Engineering, 2021.
+
+Things that went wrong and what changed
+- Shipped a migration without a rollback path and locked a table for 9 minutes during business
+  hours. Now every migration ships with a tested down path and runs off peak.
+- Spent three weeks on a caching layer nobody needed. Now writes a one page problem statement
+  before starting anything that takes more than a few days.

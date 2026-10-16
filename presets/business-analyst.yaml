@@ -1,0 +1,13 @@
+name: business-analyst
+mode: interview
+category: Product and projects
+title: Business analyst
+role: Business analyst (requirements, processes)
+focus:
+  - requirements they gathered and how conflicts between them were settled
+  - a process they mapped and improved, with the measured change
+  - working between business users and developers
+  - documents such as user stories or process maps
+avoid:
+  - improved efficiency with no number
+  - decisions that belong to the stakeholders

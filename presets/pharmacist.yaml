@@ -1,0 +1,13 @@
+name: pharmacist
+mode: interview
+category: Healthcare
+title: Pharmacist
+role: Pharmacist (community or hospital)
+focus:
+  - dispensing accuracy and a prescription error they caught
+  - counselling a patient in plain words
+  - stock and expiry control
+  - working with doctors
+avoid:
+  - diagnosis beyond their scope
+  - recommending medicine without the patient's details
