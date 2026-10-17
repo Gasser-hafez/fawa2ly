@@ -42,16 +42,29 @@ try { section = localStorage.getItem("settings-section") || "call"; } catch (e) 
 const askedSection = new URLSearchParams(location.search).get("section");
 if (askedSection) section = askedSection;
 
+/* The ten sections sit in five groups (Fawa2ly identity, 2026-10-17). `section` holds the group;
+   a section's own name still works everywhere one is asked for (?section=roles, settings-section),
+   and opens its group scrolled to it. */
+const GROUPS = {
+  call: ["call", "listening"],
+  you: ["roles", "documents"],
+  calls: ["calls"],
+  model: ["model", "keys", "usage"],
+  app: ["display", "hotkeys"],
+};
+const groupOf = (name) => Object.keys(GROUPS).find((g) => g === name || GROUPS[g].includes(name)) || "call";
+
 function showSection(name) {
-  if (!document.querySelector(`.section[data-section="${name}"]`)) name = "call";
-  section = name;
-  for (const s of document.querySelectorAll(".section")) s.hidden = s.dataset.section !== name;
-  for (const b of document.querySelectorAll("#nav button")) b.setAttribute("aria-current", String(b.dataset.section === name));
-  try { localStorage.setItem("settings-section", name); } catch (e) { /* no storage */ }
-  $("content").scrollTop = 0;
-  if (name === "usage") send("usage", {}, true);
-  if (name === "calls") send("calls", {}, true);
-  if (name === "documents") {
+  const group = groupOf(name);
+  section = group;
+  for (const s of document.querySelectorAll(".section")) s.hidden = !GROUPS[group].includes(s.dataset.section);
+  for (const b of document.querySelectorAll("#nav button")) b.setAttribute("aria-current", String(b.dataset.section === group));
+  try { localStorage.setItem("settings-section", group); } catch (e) { /* no storage */ }
+  const target = name !== group && document.querySelector(`.section[data-section="${name}"]`);
+  if (target) target.scrollIntoView(); else $("content").scrollTop = 0;
+  if (group === "model") send("usage", {}, true);
+  if (group === "calls") send("calls", {}, true);
+  if (group === "you") {
     send("jobfit", {}, true);       // the comparison kept from last time (item 23)
   }
 }
@@ -524,7 +537,7 @@ function onSpeedtest(e) {
     } else {
       $("speed-status").textContent = "No model answered with usable lines.";
     }
-    if (section === "usage") send("usage", {}, true);
+    if (section === "model") send("usage", {}, true);
   }
 }
 
@@ -1154,7 +1167,7 @@ function handle(e) {
     case "hello":
       $("conn").textContent = "Connected";
       send("devices");                  // once per connection: listing opens PortAudio, which takes a moment
-      if (section === "usage") send("usage", {}, true);
+      if (section === "model") send("usage", {}, true);
       send("calls", {}, true);
       openAskedCall();
       return;

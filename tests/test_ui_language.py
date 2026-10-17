@@ -61,7 +61,7 @@ class PageText(HTMLParser):
 def test_every_string_a_window_is_written_with_has_an_arabic_translation(page):
     parser = PageText()
     parser.feed(io.open(page, encoding="utf-8").read())
-    words = {s for s in parser.found if re.search(r"[A-Za-z]", s) and not ARABIC.search(s)} - {"Fawa2ly"}
+    words = {s for s in parser.found if re.search(r"[A-Za-z]", s) and not ARABIC.search(s)} - {"Fawa2ly"}   # the brand name, the same in both languages
     assert not sorted(words - set(dictionary()))
 
 

@@ -242,7 +242,7 @@ def clean_mode(value) -> str:
 # Overlay themes (2026-09-11, design canvas 2a and 12). Each has a block in app/src/styles.css
 # and an option in app/src/settings.html; tests/test_themes.py keeps the three lists together.
 # The canvas marks the six after "light" as paid (Pro); nothing enforces that before plans (M5).
-THEMES = ("dark", "light", "aurora", "teleprompter", "paper", "terminal", "frost", "contrast")
+THEMES = ("dark", "light", "teleprompter", "contrast")   # aurora, paper, terminal, frost retired 2026-10-17
 
 
 def clean_theme(value) -> str:

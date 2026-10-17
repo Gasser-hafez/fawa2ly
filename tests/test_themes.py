@@ -38,7 +38,7 @@ def test_every_theme_has_a_style_block_and_an_option_and_nothing_else_does():
 
 
 def test_an_unknown_theme_is_refused():
-    assert user_settings.clean_theme("paper") == "paper"
+    assert user_settings.clean_theme("light") == "light"
     for bad in ("sepia", "", None, ["dark"]):
         with pytest.raises(ValueError):
             user_settings.clean_theme(bad)
@@ -72,9 +72,9 @@ def send_settings(values):
 
 
 def test_choosing_a_theme_saves_it_and_every_window_hears_it():
-    event = send_settings({"theme": "terminal"})
-    assert event["type"] == "settings" and event["settings"]["theme"] == "terminal"
-    assert user_settings.load().theme == "terminal"
+    event = send_settings({"theme": "teleprompter"})
+    assert event["type"] == "settings" and event["settings"]["theme"] == "teleprompter"
+    assert user_settings.load().theme == "teleprompter"
 
 
 def test_an_unknown_theme_from_a_window_changes_nothing():

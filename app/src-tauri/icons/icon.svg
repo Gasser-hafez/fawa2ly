@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Fawa2ly app icon: the mascot's head and shoulders on the toy's chest yellow.
+       Source for `npx tauri icon src-tauri/icons/icon.svg`, which writes every other file here. -->
+  <defs>
+    <clipPath id="tile"><rect width="1024" height="1024" rx="232"/></clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="1024" height="1024" fill="#F5C33B"/>
+    <g transform="translate(512 600) scale(10.4) translate(-60 -50)">
+      <path d="M60 34 C40 34 22 40 18 56 C15 68 26 76 30 86 C33 96 42 104 60 104 C78 104 87 96 90 86 C94 76 105 68 102 56 C98 40 80 34 60 34 Z" fill="#E2341F"/>
+      <path d="M60 52 C48 52 40 60 40 72 C40 88 48 100 60 100 C72 100 80 88 80 72 C80 60 72 52 60 52 Z" fill="#FFD65C"/>
+      <path d="M44 62 Q52 66 60 60 Q68 66 76 62 M60 64 L60 96 M50 72 Q55 74 60 72 Q65 74 70 72" stroke="#D99A1C" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      <path d="M24 48 C10 52 6 70 10 86 C12 96 16 102 22 102 C28 102 30 94 30 86 C30 74 34 62 34 54 Z" fill="#E2341F"/>
+      <path d="M96 48 C110 52 114 70 110 86 C108 96 104 102 98 102 C92 102 90 94 90 86 C90 74 86 62 86 54 Z" fill="#E2341F"/>
+      <ellipse cx="28" cy="46" rx="7" ry="3" fill="#F25A3F" transform="rotate(-20 28 46)"/>
+      <ellipse cx="92" cy="46" rx="7" ry="3" fill="#F25A3F" transform="rotate(20 92 46)"/>
+      <path d="M44 18 L38 8 L50 14 Z M76 18 L82 8 L70 14 Z M56 14 L60 6 L64 14 Z" fill="#B81F14"/>
+      <path d="M40 34 C38 22 46 14 60 14 C74 14 82 22 80 34 C79 42 70 46 60 46 C50 46 41 42 40 34 Z" fill="#E2341F"/>
+      <ellipse cx="52" cy="19" rx="6" ry="2.5" fill="#F25A3F"/>
+      <path d="M41 22 Q47 18 53 22 M68 21 Q74 18 80 22" stroke="#B81F14" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="46" cy="27" r="6.5" fill="#FFF6E8"/>
+      <circle cx="75" cy="26" r="5" fill="#FFF6E8"/>
+      <circle cx="47" cy="28" r="2.6" fill="#17100E"/>
+      <circle cx="77" cy="24.5" r="2.1" fill="#17100E"/>
+      <path d="M43 35 Q60 52 79 34 Q60 41 43 35 Z" fill="#3A0D08"/>
+      <ellipse cx="61" cy="43.5" rx="5" ry="2.2" fill="#E86A7A"/>
+      <path d="M46.5 36.2 L48.5 41 L50.5 36.9 Z M71.5 36.5 L73.5 40.5 L75.5 35.7 Z" fill="#FFF6E8"/>
+    </g>
+  </g>
+</svg>
