@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The overlay and its settings window. On top of core:default: drag the frameless overlay by its header, close it from the X, hide it from its Hide button, and open or refocus the settings window. None of these are in core:default (checked against gen/schemas/acl-manifests.json), and a missing one fails silently.",
+  "description": "The overlay and its settings window, both frameless. On top of core:default: drag either window by its title bar, close it, minimize it, maximize the settings window from its button or a double click on its title bar, restore a minimized overlay, and open or refocus the settings window. None of these are in core:default (checked against gen/schemas/acl-manifests.json), and a missing one fails silently.",
   "windows": [
     "main",
     "settings"
@@ -12,6 +12,11 @@
     "core:window:allow-close",
     "core:window:allow-hide",
     "core:window:allow-set-focus",
-    "core:webview:allow-create-webview-window"
+    "core:webview:allow-create-webview-window",
+    "core:window:allow-minimize",
+    "core:window:allow-unminimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-internal-toggle-maximize",
+    "core:window:allow-is-maximized"
   ]
 }

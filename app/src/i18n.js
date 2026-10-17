@@ -20,8 +20,10 @@ every string in both pages has a translation here.
     // ---- overlay ----
     "Fawa2ly settings": "إعدادات فوقلي",
     "Settings": "الإعدادات",
-    "Hide the window (Ctrl+Shift+P shows it again)": "إخفاء النافذة (Ctrl+Shift+P يعيد إظهارها)",
+    "Minimize (click Fawa2ly in the taskbar to bring it back)": "تصغير (اضغط على فوقلي في شريط المهام لإعادتها)",
     "Close": "إغلاق",
+    "Minimize": "تصغير",
+    "Maximize": "تكبير",
     "Connecting to engine": "جارٍ الاتصال بالمحرك",
     "No background document is loaded: answers cannot use your experience": "لا يوجد مستند خلفية: الإجابات لن تستخدم خبرتك",
     "No CV": "لا توجد سيرة ذاتية",

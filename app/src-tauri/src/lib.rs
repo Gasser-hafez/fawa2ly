@@ -207,6 +207,16 @@ fn start_engine(app: &AppHandle) -> Option<Child> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
+        // One Fawa2ly at a time (QA 2026-10-17): opening it again from the Start menu while it runs
+        // minimized or hidden started a second overlay. Now the running one comes back instead.
+        // Registered first, so a second launch exits before it starts an engine or takes hotkeys.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -222,10 +232,16 @@ pub fn run() {
                     };
                     match action.as_str() {
                         "toggle" => {
-                            if window.is_visible().unwrap_or(false) {
+                            // A minimized window still counts as visible on Windows, so the
+                            // hotkey would hide it instead of bringing it back (QA 2026-10-17).
+                            let minimized = window.is_minimized().unwrap_or(false);
+                            if window.is_visible().unwrap_or(false) && !minimized {
                                 let _ = window.hide();
                             } else {
                                 let _ = window.show();
+                                if minimized {
+                                    let _ = window.unminimize();
+                                }
                                 let _ = window.set_focus();
                             }
                         }
