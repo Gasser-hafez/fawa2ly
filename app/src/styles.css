@@ -259,8 +259,6 @@ svg.ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-wi
   gap: var(--s3);
   padding: var(--s4);
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--scroll) transparent;
 }
 #panel[data-state="paused"] #body { opacity: .5; }
 
@@ -543,9 +541,18 @@ select option { background: var(--panel-solid); color: var(--ink); }
   color: var(--ink-3);
   white-space: nowrap;
   overflow: hidden;
-  /* the tail is what matters: older words fade off the left edge */
+  min-width: 0;
+}
+/* The tail is what matters: once a caption is wider than the strip, main.js scrolls it to its end
+   and marks it .clip, and older words fade off the start. A short caption is left untouched, so its
+   first letter no longer fades (QA 2026-10-17: "not listening" read "ot listening"). */
+#caption span.clip {
   mask-image: linear-gradient(to right, transparent, #000 34px);
   -webkit-mask-image: linear-gradient(to right, transparent, #000 34px);
+}
+#caption span.clip:dir(rtl) {
+  mask-image: linear-gradient(to left, transparent, #000 34px);
+  -webkit-mask-image: linear-gradient(to left, transparent, #000 34px);
 }
 #caption span.muted { opacity: .6; }
 
@@ -943,3 +950,61 @@ select option { background: var(--panel-solid); color: var(--ink); }
 :root[dir="rtl"] .nav svg.ico { transform: scaleX(-1); }
 #current > .head { background: var(--fill); border-radius: var(--r2); padding: var(--s3) var(--s3) var(--s3) var(--s4); }
 #current[data-phase="lines"] > .head, #current[data-phase="failed"] > .head { background: none; padding: 0; }
+
+/* ---------- QA pass (2026-10-17): what a full walk through every state turned up ---------- */
+
+/* Scrollbars in the brand, without the arrow buttons WebView2 draws on Windows. The standard
+   scrollbar-color property would switch these rules off, so it is not used. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--ink-3); }
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* The status strip never pushes Pause and End out of the window: the state shortens, the model
+   picker shrinks, and the badges (No CV, click-through, pace) drop to a row of their own. */
+#status { flex-wrap: wrap; row-gap: 6px; }
+#state { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#status > :is(#pause, #end, #dot) { flex: none; }
+#provider-pick { min-width: 0; flex-shrink: 1; max-width: 16ch; }
+#status > :is(.badge, .pace) { order: 2; }
+#status:has(> :is(.badge, .pace):not([hidden]))::after { content: ""; order: 1; flex-basis: 100%; height: 0; }
+/* not in a call: nothing to pause */
+#panel[data-state="connecting"] #pause,
+#panel[data-state="offline"] #pause { display: none; }
+
+/* the mascot stays inside its box: its shoulders ran under the status strip */
+.mascot svg { overflow: hidden; }
+
+/* the big mascot on the empty states: the same drawing, so it takes the panel's mood */
+.notice .mascot { width: 96px; height: 80px; margin-bottom: var(--s1); }
+#panel[data-state="listening"] .notice { align-items: center; text-align: center; }
+#panel[data-state="listening"] .notice p { margin-inline: auto; }
+#panel[data-state="stopped"] .notice .mascot { display: none; }
+
+/* a badge that is not a warning (click-through) still reads as a badge */
+.badge { color: var(--ink-2); background: var(--fill-2); }
+
+/* the ended call's list: verdicts one width, so the questions line up */
+#earlier li .q-verdict { min-width: 74px; text-align: center; }
+
+/* setup: Start stays in reach without scrolling to the bottom of the form */
+.actions.start {
+  position: sticky;
+  bottom: calc(var(--s4) * -1);
+  margin-inline: calc(var(--s4) * -1);
+  padding: var(--s3) var(--s4) var(--s4);
+  background: linear-gradient(to bottom, transparent, var(--panel-solid) 30%);
+  z-index: 1;
+}
+
+/* sliders in the brand colour, not the browser's blue */
+input[type="range"] { accent-color: var(--brand); }
+
+/* teleprompter and high contrast: the writing marker and End follow the theme */
+:root[data-theme="teleprompter"] #writing i,
+:root[data-theme="contrast"] #writing i { background: var(--accent); }
+:root[data-theme="contrast"] #end { color: #ffffff; border-color: #ffffff; border-radius: 0; }
+:root[data-theme="contrast"] .actions button { border: 2px solid #ffffff; border-radius: 0; }
+:root[data-theme="contrast"] .actions button.primary { box-shadow: none; }

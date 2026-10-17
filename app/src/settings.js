@@ -34,6 +34,17 @@ const roleTitle = (name) => (presetInfo[name] && presetInfo[name].title) || name
 const rolesFor = (mode) => presets.filter((p) => (presetModes[p] || "interview") === mode)
   .sort((a, b) => roleTitle(a).localeCompare(roleTitle(b)));
 
+/* ---------- the window's own title bar (QA 2026-10-17) ----------
+   The settings window is frameless so its title bar matches the app; these are its three buttons.
+   Opened in a browser instead (the UI fast loop), Close still closes the tab and the others do nothing. */
+{
+  const tauri = window.__TAURI__;
+  const win = tauri && tauri.window ? tauri.window.getCurrentWindow() : null;
+  $("win-min").addEventListener("click", () => win && win.minimize());
+  $("win-max").addEventListener("click", () => win && win.toggleMaximize());
+  $("win-close").addEventListener("click", () => (win ? win.close() : window.close()));
+}
+
 /* ---------- sections ---------- */
 
 let section = "call";
@@ -624,6 +635,11 @@ const MODIFIER_KEYS = new Set(["Control", "Alt", "Shift", "Meta", "AltGraph"]);
 let hotkeyErrors = {};            // action -> why the window could not register it ("" = fine)
 let recording = null;             // the action whose box has focus
 
+// A saved combination names keys by their code ("Ctrl+BracketRight"); the box shows the key itself.
+const KEY_SIGNS = { BracketLeft: "[", BracketRight: "]", Backquote: "`", Minus: "-", Equal: "=", Semicolon: ";",
+                    Quote: "'", Comma: ",", Period: ".", Slash: "/", Backslash: "\\" };
+const prettyCombo = (combo) => (combo || "").split("+").map((k) => KEY_SIGNS[k] || k).join("+");
+
 function renderHotkeys(hotkeys) {
   const box = $("hotkeys");
   if (!box.children.length) {
@@ -649,7 +665,7 @@ function renderHotkeys(hotkeys) {
   }
   for (const [action] of HOTKEY_LABELS) {
     const input = $(`hk-${action}`);
-    if (recording !== action) input.value = hotkeys[action] || "";
+    if (recording !== action) input.value = prettyCombo(hotkeys[action]);
     input.placeholder = recording === action ? "Press the keys" : "Not set";
     const why = hotkeyErrors[action] || "";
     $(`hk-why-${action}`).textContent = why ? `Not active: ${why}` : "";

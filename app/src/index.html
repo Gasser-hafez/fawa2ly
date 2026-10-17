@@ -35,7 +35,7 @@
         <span class="wordmark" data-tauri-drag-region translate="no">fawa<b>2</b>ly</span>
         <span class="spacer" data-tauri-drag-region></span>
         <button id="open-settings" class="icon" type="button" title="Settings"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></button>
-        <button id="hide" class="icon" type="button" title="Hide the window (Ctrl+Shift+P shows it again)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
+        <button id="hide" class="icon" type="button" title="Minimize (click Fawa2ly in the taskbar to bring it back)"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
         <button id="close" type="button" title="Close"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </header>
 
@@ -59,6 +59,26 @@
           <button type="button" id="act-ask" title="Questions you could ask the other side">Questions to ask</button>
         </div>
         <section id="notice" class="notice">
+          <span class="mascot" aria-hidden="true">
+            <svg viewBox="26 2 68 56">
+              <g class="body">
+                <path d="M60 34 C40 34 22 40 18 56 C15 68 26 76 30 86 L90 86 C94 76 105 68 102 56 C98 40 80 34 60 34 Z" fill="#E2341F"/>
+                <path d="M60 52 C48 52 40 60 40 72 L80 72 C80 60 72 52 60 52 Z" fill="#F5C33B"/>
+                <ellipse cx="28" cy="46" rx="7" ry="3" fill="#F25A3F" transform="rotate(-20 28 46)"/>
+                <ellipse cx="92" cy="46" rx="7" ry="3" fill="#F25A3F" transform="rotate(20 92 46)"/>
+                <path d="M44 18 L38 8 L50 14 Z M76 18 L82 8 L70 14 Z M56 14 L60 6 L64 14 Z" fill="#B81F14"/>
+                <path d="M40 34 C38 22 46 14 60 14 C74 14 82 22 80 34 C79 42 70 46 60 46 C50 46 41 42 40 34 Z" fill="#E2341F"/>
+                <path d="M41 22 Q47 18 53 22 M68 21 Q74 18 80 22" stroke="#B81F14" stroke-width="2" fill="none" stroke-linecap="round"/>
+                <g class="open"><circle cx="46" cy="27" r="6.5" fill="#FFF6E8"/><circle cx="75" cy="26" r="5" fill="#FFF6E8"/><circle cx="47" cy="28" r="2.6" fill="#17100E"/><circle cx="77" cy="24.5" r="2.1" fill="#17100E"/></g>
+                <g class="squint"><path d="M40 27 Q46 23 52 27" stroke="#3A0D08" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="75" cy="26" r="5" fill="#FFF6E8"/><circle cx="76" cy="22.6" r="2.1" fill="#17100E"/></g>
+                <g class="xeyes"><path d="M42 23 L50 31 M50 23 L42 31 M72 23 L78 29 M78 23 L72 29" stroke="#3A0D08" stroke-width="2.5" fill="none" stroke-linecap="round"/></g>
+                <g class="smile"><path d="M44 37 Q60 46 78 36" stroke="#3A0D08" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M47.5 39 L49.5 44 L51.5 39.4 Z M69.5 39.5 L71 43 L72.8 39 Z" fill="#FFF6E8"/></g>
+                <g class="grin"><path d="M43 35 Q60 52 79 34 Q60 41 43 35 Z" fill="#3A0D08"/><ellipse cx="61" cy="43.5" rx="5" ry="2.2" fill="#E86A7A"/><path d="M46.5 36.2 L48.5 41 L50.5 36.9 Z M71.5 36.5 L73.5 40.5 L75.5 35.7 Z" fill="#FFF6E8"/></g>
+                <g class="wavy"><path d="M47 39 Q51 36 55 39 Q59 42 63 39 Q67 36 71 39" stroke="#3A0D08" stroke-width="2.5" fill="none" stroke-linecap="round"/></g>
+                <g class="gasp"><ellipse cx="60" cy="39" rx="6" ry="4" fill="#3A0D08"/><path d="M57.5 41 Q60 50 63 41 Z" fill="#E86A7A"/></g>
+              </g>
+            </svg>
+          </span>
           <h1 id="notice-title">Fawa2ly cannot hear the call yet.</h1>
           <p id="notice-text">Waiting on the local engine. Nothing will be suggested until this connects.</p>
           <p id="notice-note" class="notice-note" hidden></p>

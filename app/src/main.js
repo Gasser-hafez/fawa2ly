@@ -104,8 +104,14 @@ function setPanel(state) {
 }
 
 function setCaption(text, muted) {
-  el.captionText.textContent = text;
-  el.captionText.classList.toggle("muted", Boolean(muted));
+  const span = el.captionText;
+  span.textContent = text;
+  span.classList.toggle("muted", Boolean(muted));
+  // The newest words are the ones to read: a caption wider than the strip is scrolled to its end
+  // and fades at the start; a short one is left alone (QA 2026-10-17).
+  const clipped = span.scrollWidth > span.clientWidth + 1;
+  span.classList.toggle("clip", clipped);
+  if (clipped) span.scrollLeft = getComputedStyle(span).direction === "rtl" ? -span.scrollWidth : span.scrollWidth;
 }
 
 function notice(title, text, action, note) {
@@ -725,9 +731,12 @@ el.shorter.addEventListener("click", () => {
   const item = shown();
   if (item) send("action", { kind: "shorter", n: item.n });
 });
+// Minimize, not hide (QA 2026-10-17): a hidden window has no taskbar button, so a user who forgot
+// the show/hide hotkey - or had changed it - could not get the overlay back. Minimized, it is one
+// click away in the taskbar, and the hotkey still restores it (lib.rs).
 el.hide.addEventListener("click", () => {
   const tauri = window.__TAURI__;
-  if (tauri && tauri.window) tauri.window.getCurrentWindow().hide();   // Ctrl+Shift+P brings it back
+  if (tauri && tauri.window) tauri.window.getCurrentWindow().minimize();
 });
 // Click-through is toggled by a global hotkey on the Rust side (a window that ignores the mouse
 // cannot be clicked to turn it off); this only shows that it is on, so a click that lands on the
@@ -834,8 +843,10 @@ async function openSettings(sectionName, extra) {
   } catch (e) {
     console.error("settings window lookup", e);
   }
+  // Frameless, like the overlay: settings.html draws its own title bar in the app's look.
   new WebviewWindow("settings", { url, title: "Fawa2ly settings", width: 1040, height: 720,
-                                  minWidth: 820, minHeight: 560, resizable: true, focus: true });
+                                  minWidth: 820, minHeight: 560, resizable: true, focus: true,
+                                  decorations: false });
 }
 el.openSettings.addEventListener("click", () => openSettings());
 el.changeRole.addEventListener("click", () => openSettings("roles"));
