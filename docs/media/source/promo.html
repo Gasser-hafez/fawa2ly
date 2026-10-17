@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fawa2ly promo</title>
+<!-- The README promo. Every frame is a pure function of time: seek(t) draws second t, so capture.py
+     can step through it frame by frame. The overlay is the real app in an iframe (demo-state.js).
+     Open it in a browser to watch: it plays itself unless ?still is in the URL. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan+2:wght@700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+<style>
+  :root { --night:#17100e; --hide:#2a1d1a; --red:#e2341f; --press:#b81f14; --yellow:#f5c33b; --fang:#fff6e8; --ink2:#e9dcd3; --ink3:#a8968f; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 960px; height: 540px; overflow: hidden; background: var(--night); }
+  body { color: var(--fang); font-family: "IBM Plex Sans Arabic", "Segoe UI", sans-serif; }
+  #stage { position: relative; width: 960px; height: 540px; overflow: hidden; }
+  .abs { position: absolute; will-change: transform, opacity; }
+  .display { font-family: "Baloo Bhaijaan 2", sans-serif; font-weight: 800; line-height: 1; }
+  .glow { position: absolute; border-radius: 50%; filter: blur(80px); }
+
+  #m1, #m2 { width: 190px; height: 190px; }
+  #bubble { background: var(--yellow); color: var(--night); font-size: 30px; padding: 10px 18px 6px; border-radius: 20px 20px 20px 6px; transform-origin: 0 100%; }
+  #word { font-size: 104px; display: flex; justify-content: center; width: 960px; letter-spacing: -1px; }
+  #word span { display: inline-block; }
+  #word .two { color: var(--yellow); }
+  #tag { font-size: 25px; color: var(--ink2); white-space: nowrap; width: 960px; text-align: center; }
+
+  .kicker { font-size: 34px; white-space: nowrap; }
+  .kicker em { font-style: normal; color: var(--yellow); }
+
+  #call { width: 560px; height: 380px; background: #221a18; border: 1px solid rgba(255,220,200,.10); border-radius: 18px; overflow: hidden; box-shadow: 0 30px 60px rgba(0,0,0,.45); }
+  #call .main { position: absolute; inset: 12px 12px 64px; border-radius: 12px; background: #3a2c28; overflow: hidden; }
+  #call .avatar { position: absolute; left: 50%; top: 40%; transform: translate(-50%,-50%); width: 120px; height: 120px; border-radius: 50%; background: #6b4f45; display: grid; place-items: center; font-size: 50px; font-weight: 600; color: #f3e3d8; }
+  #call .ring { position: absolute; left: 50%; top: 40%; width: 120px; height: 120px; border-radius: 50%; border: 3px solid #7fd39b; transform: translate(-50%,-50%); }
+  #call .name { position: absolute; left: 12px; bottom: 10px; background: rgba(0,0,0,.45); padding: 4px 10px; border-radius: 8px; font-size: 12px; color: #f3e3d8; }
+  #call .sub { position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%); width: 86%; min-height: 50px; text-align: center; background: rgba(0,0,0,.55); padding: 8px 14px; border-radius: 10px; font-size: 16px; line-height: 1.4; color: #fff; }
+  #call .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; display: flex; justify-content: center; align-items: center; gap: 12px; }
+  #call .btn { width: 40px; height: 40px; border-radius: 50%; background: #3a2c28; display: grid; place-items: center; }
+  #call .btn.hang { background: #c4321f; width: 56px; border-radius: 20px; }
+  #call svg { width: 18px; height: 18px; fill: none; stroke: #f3e3d8; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  #ovwrap { width: 322px; height: 490px; transform-origin: 50% 50%; filter: drop-shadow(0 26px 44px rgba(0,0,0,.6)); }
+  #ov { width: 460px; height: 700px; border: 0; background: transparent; transform: scale(.7); transform-origin: 0 0; }
+
+  .chip { display: flex; align-items: center; gap: 12px; background: var(--hide); border-radius: 16px; padding: 12px 18px; font-size: 19px; color: var(--fang); white-space: nowrap; }
+  .chip i { width: 30px; height: 30px; border-radius: 10px; background: var(--red); display: grid; place-items: center; flex: none; }
+  .chip i svg { width: 17px; height: 17px; fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+  #endrow { width: 960px; display: flex; justify-content: center; align-items: baseline; gap: 22px; }
+  #endword { font-size: 92px; }
+  #endword b { color: var(--yellow); font-weight: inherit; }
+  #endar { font-size: 50px; color: var(--red); }
+  #ctarow { width: 960px; display: flex; justify-content: center; }
+  #cta { background: var(--red); color: #fff; font-size: 22px; padding: 12px 24px 9px; border-radius: 16px; box-shadow: inset 0 -4px 0 var(--press); white-space: nowrap; }
+  #url { font-size: 17px; color: var(--ink3); white-space: nowrap; width: 960px; text-align: center; }
+  #fade { inset: 0; background: var(--night); pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="glow" id="g1" style="width:460px;height:460px;background:#e2341f;opacity:.28"></div>
+  <div class="glow" id="g2" style="width:420px;height:420px;background:#f5c33b;opacity:.12"></div>
+
+  <div class="abs" id="m1"></div>
+  <div class="abs display" id="bubble" lang="ar" dir="rtl">فوقلي!</div>
+  <h1 class="abs display" id="word"><span>f</span><span>a</span><span>w</span><span>a</span><span class="two">2</span><span>l</span><span>y</span></h1>
+  <p class="abs" id="tag">The interview assistant that tells you what to say.</p>
+
+  <div class="abs display kicker" id="k1">They ask<em>…</em></div>
+  <div class="abs display kicker" id="k2">It catches the question.</div>
+  <div class="abs display kicker" id="k3">You get the <em>answer</em>.</div>
+  <div class="abs display kicker" id="k4">Built for real calls.</div>
+
+  <div class="abs" id="call">
+    <div class="main">
+      <div class="ring"></div>
+      <div class="avatar">N</div>
+      <div class="sub" id="sub"></div>
+      <div class="name">Nour · Hiring manager</div>
+    </div>
+    <div class="bar">
+      <div class="btn"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
+      <div class="btn"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 11l5-3v8l-5-3"/></svg></div>
+      <div class="btn hang"><svg viewBox="0 0 24 24"><path d="M3 14c5-5 13-5 18 0l-2 3-4-1v-3c-2-1-4-1-6 0v3l-4 1z"/></svg></div>
+    </div>
+  </div>
+
+  <div class="abs" id="ovwrap"><iframe id="ov" src="/app/src/index.html?port=1"></iframe></div>
+
+  <div class="abs chip" id="c1"><i><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/></svg></i>Grounded in your CV, not made up</div>
+  <div class="abs chip" id="c2"><i><svg viewBox="0 0 24 24"><path d="M4 5h9M8.5 3v2M6 5c0 4 3 7 6 8M11 5c-1 4-4 7-7 8"/><path d="M13 21l4-9 4 9M14.5 18h5"/></svg></i>English &amp; العربية</div>
+  <div class="abs chip" id="c3"><i><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></svg></i>Your own API keys, or fully local</div>
+  <div class="abs chip" id="c4"><i><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></i>Nothing saved unless you say so</div>
+  <div class="abs chip" id="c5"><i><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg></i>60+ roles, interviews and meetings</div>
+
+  <div class="abs" id="m2"></div>
+  <div class="abs" id="endrow"><h2 class="display" id="endword">fawa<b>2</b>ly</h2><div class="display" id="endar" lang="ar" dir="rtl">فوقلي</div></div>
+  <div class="abs" id="ctarow"><div class="display" id="cta">Download for Windows</div></div>
+  <div class="abs" id="url">github.com/Gasser-hafez/fawa2ly</div>
+
+  <div class="abs" id="fade"></div>
+</div>
+
+<script src="mascot.js"></script>
+<script src="demo-state.js"></script>
+<script>
+const PROMO_SECONDS = 18;
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, p) => a + (b - a) * p;
+const outCubic = (p) => 1 - Math.pow(1 - p, 3);
+const inCubic = (p) => p * p * p;
+const inOut = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+const outBack = (p) => { const c = 1.70158; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); };
+// a damped wobble after an impact: 1 at the hit, settling to 0
+const wobble = (p, f = 3) => Math.exp(-5 * p) * Math.cos(f * Math.PI * p);
+function place(el, x, y, o = 1, s = 1, extra = "") {
+  el.style.left = x + "px"; el.style.top = y + "px";
+  el.style.opacity = o; el.style.transform = `scale(${s}) ${extra}`;
+  el.style.visibility = o <= 0.001 ? "hidden" : "visible";
+}
+// in at [a,b], out at [c,d]: an opacity envelope
+const env = (t, a, b, c, d) => (t < c ? outCubic(prog(t, a, b)) : 1 - inCubic(prog(t, c, d)));
+
+/* the mascot drops in at `t0`, squashes on landing, springs back */
+function drop(el, t, t0, mood) {
+  const fall = prog(t, t0, t0 + 0.5);
+  if (t < t0 + 0.5) {
+    fawaMascot(el, { mood: "idle", dy: lerp(-260, 0, inCubic(fall)), sx: 0.92, sy: 1.1 });
+  } else {
+    const w = wobble(prog(t, t0 + 0.5, t0 + 1.4), 2.4);
+    fawaMascot(el, { mood: t > t0 + 0.75 ? mood : "thinking", sx: 1 + 0.26 * w, sy: 1 - 0.3 * w });
+  }
+}
+
+const Q = "Tell me about a time something you shipped went wrong. What did you change?";
+const LIVE = fawaExamples.live.lines;
+const LT = [7.2, 7.95, 8.7, 9.45];          // when each line starts typing
+const TYPE = 0.6;
+
+function overlayState(t) {
+  if (t >= 13.2) return { ...fawaExamples.arabic, done: true, pos: null };
+  const base = { state: "listening", provider: "groq", actions: true, caption: Q };
+  if (t < 5.9) return { ...base, notice: { title: "", text: "Nothing asked yet. Lines appear here the moment a question is heard." } };
+  const typedQ = Q.slice(0, Math.round(prog(t, 5.9, 6.5) * Q.length)) || " ";
+  const lines = [];
+  LT.forEach((s, k) => { if (t >= s) lines.push(LIVE[k].slice(0, Math.max(1, Math.round(prog(t, s, s + TYPE) * LIVE[k].length)))); });
+  const done = t >= 10.3;
+  return { ...base, question: typedQ, lines, busy: lines.length === 0, done, phase: lines.length ? "lines" : "waiting",
+           caption: t < 6.6 ? Q : "…so what did you change after that?" };
+}
+
+let ovDoc = null, lastLang = null;
+function drawOverlay(t) {
+  if (!ovDoc) return;
+  const s = overlayState(t);
+  fawaDemo(ovDoc, s);
+  // the newest line rises in, as it does in the app
+  const k = (s.lines || []).length - 1;
+  const li = ovDoc.querySelector("#lines li:last-child");
+  if (li && k >= 0 && t < 13.2) {
+    const p = outCubic(prog(t, LT[k], LT[k] + 0.3));
+    li.style.opacity = p; li.style.transform = `translateY(${(1 - p) * 10}px)`;
+  }
+}
+
+function seek(t) {
+  // background drift; held still for the GIF (?gif), where a moving glow changes every pixel of
+  // every frame and the file grows past what GitHub will show
+  const tb = new URLSearchParams(location.search).has("gif") ? 0 : t;
+  place($("g1"), lerp(-140, 40, Math.sin(tb / 3) * 0.5 + 0.5), lerp(-160, -60, Math.cos(tb / 4) * 0.5 + 0.5));
+  place($("g2"), lerp(640, 760, Math.cos(tb / 3.5) * 0.5 + 0.5), lerp(300, 380, Math.sin(tb / 5) * 0.5 + 0.5));
+
+  /* ---- 1 · intro, 0 to 3 s ---- */
+  const outI = inCubic(prog(t, 2.7, 3.2));
+  drop($("m1"), t, 0.1, "ready");
+  place($("m1"), 385, 62 - outI * 40, 1 - outI);
+  const pb = prog(t, 0.95, 1.35);
+  place($("bubble"), 548, 76 - outI * 40, (t > 0.95 ? 1 : 0) * (1 - outI), outBack(pb), `rotate(${-8 + 4 * wobble(prog(t, 1.35, 2.4))}deg)`);
+  [...$("word").children].forEach((sp, i) => {
+    const p = outBack(prog(t, 1.15 + i * 0.05, 1.55 + i * 0.05));
+    sp.style.transform = `translateY(${(1 - p) * 40}px)`; sp.style.opacity = clamp(p * 1.4);
+  });
+  place($("word"), 0, 270 - outI * 40, 1 - outI);
+  place($("tag"), 0, 395 - outI * 40, outCubic(prog(t, 1.7, 2.1)) * (1 - outI));
+
+  /* ---- 2 · the question, 3 to 5.5 s ---- */
+  const callIn = outCubic(prog(t, 3.0, 3.6));
+  const callLeft = outCubic(prog(t, 5.2, 5.8));
+  const callOut = inOut(prog(t, 11.4, 12.0));
+  place($("call"), lerp(1000, 200, callIn) - 160 * callLeft - 120 * callOut, 96, 1 - callOut, 1);
+  const typed = Q.slice(0, Math.round(prog(t, 3.6, 5.1) * Q.length));
+  $("sub").textContent = typed;
+  $("sub").style.visibility = typed ? "visible" : "hidden";
+  $("call").querySelector(".ring").style.opacity = t > 3.6 && t < 5.2 ? 0.6 + 0.4 * Math.sin(t * 9) : 0;
+  place($("k1"), 200, 34, env(t, 3.3, 3.7, 5.1, 5.5));
+
+  /* ---- 3 · the answer, 5.5 to 11.5 s ---- */
+  place($("k2"), 40, 34, env(t, 5.8, 6.2, 8.1, 8.5));
+  place($("k3"), 40, 34, env(t, 8.5, 8.9, 11.2, 11.6));
+  const ovIn = prog(t, 5.3, 5.9);
+  const ovX = lerp(980, 612, outCubic(ovIn)) - lerp(0, 492, inOut(prog(t, 11.6, 12.2)));
+  const land = t > 5.9 ? wobble(prog(t, 5.9, 6.7), 2.6) : 0;
+  // the Arabic flip: squeeze to a sliver, swap, spring back
+  const flip = t > 12.95 && t < 13.45 ? Math.abs(Math.cos(Math.PI * prog(t, 12.95, 13.45))) : 1;
+  const ovOut = inCubic(prog(t, 14.6, 15.1));
+  place($("ovwrap"), ovX, 25 + ovOut * 30, 1 - ovOut, 1, `scale(${(1 + 0.05 * land) * Math.max(flip, 0.04)}, ${1 - 0.05 * land})`);
+  if (t > 5.0 && t < 15.2) drawOverlay(t);
+
+  /* ---- 4 · what it is built on, 11.5 to 14.6 s ---- */
+  place($("k4"), 486, 64, env(t, 12.0, 12.4, 14.4, 14.8));
+  ["c1", "c2", "c3", "c4", "c5"].forEach((id, i) => {
+    const a = 12.3 + i * 0.32;
+    const p = prog(t, a, a + 0.4);
+    const o = env(t, a, a + 0.3, 14.5 + i * 0.04, 14.9 + i * 0.04);
+    place($(id), 486 + (1 - outCubic(p)) * 60, 132 + i * 66, o, lerp(0.9, 1, outBack(p)));
+  });
+
+  /* ---- 5 · end card, 15 to 18 s ---- */
+  drop($("m2"), t, 15.0, "ready");
+  place($("m2"), 385, 34, t > 15.0 ? 1 : 0);
+  const ew = outBack(prog(t, 15.5, 15.95));
+  place($("endrow"), 0, 236 + (1 - ew) * 30, clamp(ew * 1.4));
+  const ct = outBack(prog(t, 16.0, 16.4));
+  place($("ctarow"), 0, 362, clamp(ct * 1.4), lerp(0.8, 1, ct));
+  place($("url"), 0, 428, outCubic(prog(t, 16.3, 16.7)));
+
+  // in from night, back to night, so the loop has no seam
+  place($("fade"), 0, 0, Math.max(1 - prog(t, 0, 0.25), prog(t, 17.4, 18)));
+}
+
+window.promoReady = new Promise((done) => {
+  $("ov").addEventListener("load", async () => {
+    ovDoc = $("ov").contentDocument;
+    await ovDoc.fonts.ready;
+    await document.fonts.ready;
+    seek(0);
+    done(true);
+  });
+});
+
+if (!new URLSearchParams(location.search).has("still")) {
+  window.promoReady.then(() => {
+    const start = performance.now();
+    const tick = (now) => { seek(((now - start) / 1000) % PROMO_SECONDS); requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  });
+}
+</script>
+</body>
+</html>

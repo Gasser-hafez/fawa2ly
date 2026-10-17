@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fawa2ly stage</title>
+<!-- The composed README images (?scene=hero|themes|how). The overlays are the real app in iframes,
+     put into a state by demo-state.js. Rendered by capture.py. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan+2:wght@700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+<style>
+  :root { --night:#17100e; --hide:#2a1d1a; --red:#e2341f; --press:#b81f14; --yellow:#f5c33b; --fang:#fff6e8; --ink2:#e9dcd3; --ink3:#a8968f; }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--night); color: var(--fang); font-family: "IBM Plex Sans Arabic", "Segoe UI", sans-serif; overflow: hidden; }
+  .scene { display: none; position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+  .scene.on { display: block; }
+  .display { font-family: "Baloo Bhaijaan 2", sans-serif; font-weight: 800; line-height: .95; }
+  .wordmark b { color: var(--yellow); font-weight: inherit; }
+  .ov { position: absolute; border: 0; background: transparent; transform-origin: 0 0; filter: drop-shadow(0 30px 50px rgba(0,0,0,.55)); }
+  .chip { display: inline-flex; align-items: center; gap: 8px; background: var(--hide); color: var(--ink2); border-radius: 999px; padding: 8px 15px; font-size: 15px; }
+  .chip i { width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
+  .glow { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .35; }
+
+  /* ---- hero ---- */
+  #hero .left { position: absolute; left: 64px; top: 64px; width: 470px; display: flex; flex-direction: column; gap: 18px; }
+  #hero .brand { display: flex; align-items: flex-end; gap: 16px; }
+  #hero .bubble { position: absolute; left: 150px; top: 40px; background: var(--yellow); color: var(--night); font-size: 30px; padding: 12px 20px 8px; border-radius: 22px 22px 22px 6px; transform: rotate(-6deg); }
+  #hero h1 { font-size: 92px; }
+  #hero .ar { font-size: 52px; color: var(--red); }
+  #hero .tag { font-size: 23px; line-height: 1.45; color: var(--ink2); }
+  #hero .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+  .call { position: absolute; background: #221a18; border: 1px solid rgba(255,220,200,.10); border-radius: 18px; overflow: hidden; box-shadow: 0 30px 60px rgba(0,0,0,.45); }
+  .call .main { position: absolute; inset: 14px 14px 70px; border-radius: 12px; background: #3a2c28; overflow: hidden; }
+  .call .avatar { position: absolute; left: 180px; top: 42%; transform: translate(-50%,-50%); width: 132px; height: 132px; border-radius: 50%; background: #6b4f45; display: grid; place-items: center; font-size: 54px; font-weight: 600; color: #f3e3d8; }
+  .call .name { position: absolute; left: 14px; bottom: 12px; background: rgba(0,0,0,.45); padding: 5px 11px; border-radius: 8px; font-size: 13px; color: #f3e3d8; }
+  .call .sub { position: absolute; left: 16px; bottom: 52px; width: 310px; text-align: start; background: rgba(0,0,0,.55); padding: 8px 14px; border-radius: 10px; font-size: 15px; line-height: 1.4; color: #fff; }
+  .call .self { position: absolute; right: 26px; bottom: 82px; width: 150px; height: 96px; border-radius: 10px; background: #4a3a34; border: 2px solid #221a18; display: grid; place-items: center; color: #e9dcd3; font-size: 13px; }
+  .call .bar { position: absolute; left: 0; width: 360px; bottom: 0; height: 70px; display: flex; justify-content: center; align-items: center; gap: 14px; }
+  .call .btn { width: 44px; height: 44px; border-radius: 50%; background: #3a2c28; display: grid; place-items: center; }
+  .call .btn.hang { background: #c4321f; width: 60px; border-radius: 22px; }
+  .call svg { width: 20px; height: 20px; fill: none; stroke: #f3e3d8; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---- themes ---- */
+  #themes h2 { position: absolute; left: 46px; top: 40px; font-size: 46px; }
+  #themes p.lead { position: absolute; left: 48px; top: 96px; font-size: 18px; color: var(--ink3); }
+  #themes .label { position: absolute; font-size: 17px; font-weight: 600; text-align: center; width: 267px; }
+  #themes .label span { display: block; font-size: 13px; font-weight: 400; color: var(--ink3); margin-top: 2px; }
+
+  /* ---- how ---- */
+  #how h2 { position: absolute; left: 56px; top: 40px; font-size: 46px; }
+  #how .steps { position: absolute; left: 56px; right: 56px; top: 128px; display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 22px; }
+  #how .step { background: #221714; border-radius: 26px; padding: 22px 22px 26px; display: flex; flex-direction: column; gap: 10px; min-height: 360px; position: relative; }
+  #how .step .m { width: 118px; height: 118px; margin: 0 auto 4px; }
+  #how .n { position: absolute; top: 18px; left: 18px; width: 34px; height: 34px; border-radius: 11px; background: var(--yellow); color: var(--night); display: grid; place-items: center; font-size: 19px; padding-top: 3px; }
+  #how h3 { font-size: 25px; }
+  #how .step p { font-size: 15.5px; line-height: 1.5; color: var(--ink2); }
+</style>
+</head>
+<body>
+
+<section class="scene" id="hero">
+  <div class="glow" style="width:520px;height:520px;left:-160px;top:-180px;background:#e2341f"></div>
+  <div class="glow" style="width:460px;height:460px;right:-120px;bottom:-200px;background:#f5c33b;opacity:.16"></div>
+  <div class="left">
+    <div style="position:relative;height:190px">
+      <div data-mascot="ready" style="position:absolute;left:-14px;top:0;width:190px;height:190px"></div>
+      <div class="bubble display" lang="ar" dir="rtl">فوقلي!</div>
+    </div>
+    <div class="brand"><h1 class="display wordmark">fawa<b>2</b>ly</h1><span class="display ar" lang="ar" dir="rtl">فوقلي</span></div>
+    <p class="tag">The interview assistant that listens to the call, catches the question, and shows you what to say, in seconds.</p>
+    <div class="chips"><span class="chip"><i></i>Windows</span><span class="chip"><i></i>English &amp; العربية</span><span class="chip"><i></i>Your own API keys</span><span class="chip"><i></i>Your CV, your words</span></div>
+  </div>
+  <div class="call" style="left:560px;top:120px;width:620px;height:420px">
+    <div class="main">
+      <div class="avatar">N</div>
+      <div class="sub">Tell me about a time something you shipped went wrong. What did you change?</div>
+      <div class="name">Nour · Hiring manager</div>
+    </div>
+    <div class="bar">
+      <div class="btn"><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
+      <div class="btn"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 11l5-3v8l-5-3"/></svg></div>
+      <div class="btn hang"><svg viewBox="0 0 24 24"><path d="M3 14c5-5 13-5 18 0l-2 3-4-1v-3c-2-1-4-1-6 0v3l-4 1z"/></svg></div>
+    </div>
+  </div>
+  <iframe class="ov" data-example="live" src="/app/src/index.html?port=1" width="460" height="760" style="left:920px;top:48px;transform:scale(.72)"></iframe>
+</section>
+
+<section class="scene" id="themes">
+  <h2 class="display">Four looks, one face</h2>
+  <p class="lead">Fawa2ly, Daylight, Teleprompter and High contrast. Opacity, text size and click-through on top.</p>
+</section>
+
+<section class="scene" id="how">
+  <h2 class="display">How it works</h2>
+  <div class="steps">
+    <div class="step"><span class="n display">1</span><div class="m" data-mascot="listening"></div><h3 class="display">Hears the call</h3><p>The other side comes from your speakers; your microphone is optional. Each side is its own stream, so it never guesses who spoke.</p></div>
+    <div class="step"><span class="n display">2</span><div class="m" data-mascot="thinking"></div><h3 class="display">Catches the question</h3><p>About a second of silence closes a turn. It can ask the model early, while the question is still being finished.</p></div>
+    <div class="step"><span class="n display">3</span><div class="m" data-mascot="ready"></div><h3 class="display">Writes your lines</h3><p>3 to 5 short lines from your CV and your role, streamed onto the overlay as they're written.</p></div>
+    <div class="step"><span class="n display">4</span><div class="m" data-mascot="idle"></div><h3 class="display">You say it</h3><p>Read in order, the lines make one answer. Ask for Shorter, More, a Recap or questions to ask, any time.</p></div>
+  </div>
+</section>
+
+<script src="mascot.js"></script>
+<script src="demo-state.js"></script>
+<script>
+  const scene = new URLSearchParams(location.search).get("scene") || "hero";
+  document.getElementById(scene).classList.add("on");
+
+  if (scene === "themes") {
+    const host = document.getElementById("themes");
+    const looks = [["dark", "Fawa2ly", "the default"], ["light", "Daylight", "warm cream"],
+                   ["teleprompter", "Teleprompter", "big lines, nothing else"], ["contrast", "High contrast", "for bright rooms"]];
+    looks.forEach(([theme, name, note], k) => {
+      const x = 46 + k * (267 + 40);
+      const f = document.createElement("iframe");
+      f.className = "ov"; f.width = 460; f.height = 860;
+      f.src = "/app/src/index.html?port=1";
+      f.dataset.example = "live"; f.dataset.theme = theme;
+      f.style.cssText = `left:${x}px;top:150px;transform:scale(.58)`;
+      host.appendChild(f);
+      const label = document.createElement("div");
+      label.className = "label";
+      label.style.cssText = `left:${x}px;top:${150 + 860 * .58 + 18}px`;
+      label.innerHTML = `${name}<span>${note}</span>`;
+      host.appendChild(label);
+    });
+  }
+
+  const frames = [...document.querySelectorAll(`#${scene} iframe[data-example]`)];
+  window.stageReady = Promise.all(frames.map((f) => new Promise((done) => {
+    f.addEventListener("load", async () => {
+      const state = { ...fawaExamples[f.dataset.example] };
+      if (f.dataset.theme) { state.theme = f.dataset.theme; state.earlier = null; state.pace = null; }
+      await f.contentDocument.fonts.ready;
+      fawaDemo(f.contentDocument, state);
+      done();
+    });
+  }))).then(() => document.fonts.ready).then(() => true);
+</script>
+</body>
+</html>
