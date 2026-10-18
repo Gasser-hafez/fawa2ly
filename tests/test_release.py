@@ -45,3 +45,17 @@ def test_the_app_only_installs_signed_updates_from_this_repository():
     assert updater["pubkey"]
     assert updater["endpoints"] == ["https://github.com/Gasser-hafez/fawa2ly/releases/latest/download/latest.json"]
     assert json.loads(read("app", "src-tauri", "tauri.bundle.json"))["bundle"]["createUpdaterArtifacts"] is True
+
+
+def test_the_workflows_leave_no_git_token_behind_and_ci_only_reads():
+    """Audit F5 (safe subset): the release job runs npm, pip and the build after checkout, with the
+    signing key in later steps; a write token left in .git/config is reachable by all of them."""
+    import yaml
+    release = yaml.safe_load(read(".github", "workflows", "release.yml"))
+    ci = yaml.safe_load(read(".github", "workflows", "ci.yml"))
+    for wf in (release, ci):
+        for job in wf["jobs"].values():
+            for step in job["steps"]:
+                if str(step.get("uses", "")).startswith("actions/checkout"):
+                    assert step.get("with", {}).get("persist-credentials") is False
+    assert ci["permissions"] == {"contents": "read"}

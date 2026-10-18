@@ -21,8 +21,9 @@ also an update: installed copies of Fawa2ly find it on their own and offer to in
 ## Once: the signing key
 
 The private key that signs updates lives on the maintainer's machine in `%USERPROFILE%\.tauri\`
-(`fawa2ly-updater.key`, its password in `fawa2ly-updater.password.txt`, and the public half in
-`fawa2ly-updater.key.pub`). **Back that folder up somewhere safe.** If the key is lost, installed
+(`fawa2ly-updater.key`, and the public half in `fawa2ly-updater.key.pub`). Keep its password in a
+password manager, not in a file beside the key: a copy of that folder alone must not be enough to
+sign an update. **Back the key up somewhere safe**, apart from the password. If the key is lost, installed
 copies can never verify another update and every user has to reinstall by hand. If it leaks,
 anyone holding it could sign an update, so it never goes in the repository.
 
@@ -32,7 +33,7 @@ repository secret):
 | Name | Value |
 |---|---|
 | `TAURI_SIGNING_PRIVATE_KEY` | the whole contents of `fawa2ly-updater.key` |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | the contents of `fawa2ly-updater.password.txt` |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | the key's password, from your password manager |
 
 The workflow stops with a message naming these secrets if they are missing.
 

@@ -19,7 +19,11 @@ jobs:
   windows-installer:
     runs-on: windows-latest
     steps:
+      # No git credentials left in .git/config for the steps after this one (npm, pip and the build
+      # run here too); publishing uses the action's own token, not git.
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       # The tag has to name the version the app reports; otherwise every install would see itself
       # as out of date and offer the same update forever.

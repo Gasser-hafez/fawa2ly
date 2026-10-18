@@ -20,3 +20,7 @@ build/
 dist/
 
 .venv/
+# The update signing key and its password never go in the repository (docs/RELEASING.md).
+*.key
+*.key.pub
+*password*.txt
