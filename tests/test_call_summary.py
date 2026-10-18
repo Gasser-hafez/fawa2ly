@@ -137,3 +137,39 @@ def test_saved_transcripts_are_counted_never_overwritten_and_deleted_on_request(
     assert user_settings.load().to_json()["transcripts"]["count"] == 2
     assert user_settings.delete_transcripts() == 2
     assert user_settings.load().to_json()["transcripts"]["count"] == 0
+
+
+def test_deleting_transcripts_also_removes_the_call_logs_kept_beside_them(monkeypatch, tmp_path):
+    """Audit F11: with saving on, each call also leaves sessions/<stamp>.jsonl, .raw.jsonl,
+    .user.raw.jsonl and .assist.jsonl, the same words. Delete used to leave them on the disk."""
+    import os
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    sessions = user_settings.sessions_dir()
+    os.makedirs(sessions)
+    for suffix in (".jsonl", ".raw.jsonl", ".user.raw.jsonl", ".assist.jsonl"):
+        open(os.path.join(sessions, "2026-10-18_10-00-00" + suffix), "w").close()
+    open(os.path.join(sessions, "notes.txt"), "w").close()
+    user_settings.delete_transcripts()
+    assert os.listdir(sessions) == ["notes.txt"], "only the call logs, nothing else in the folder"
+
+
+def test_a_crash_while_saving_settings_leaves_the_old_file_not_half_of_one(monkeypatch, tmp_path):
+    """Audit F12: settings.json was opened for writing in place, so a crash mid-write left a file that
+    read back as 'no settings', and the next save made the loss permanent."""
+    import pytest
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    s = user_settings.load()
+    s.theme = "light"
+    user_settings.save(s)
+
+    def power_cut(obj, f, **_k):
+        f.write('{"theme": "pa')                 # half a file, then the crash
+        raise RuntimeError("power cut")
+
+    monkeypatch.setattr(json, "dump", power_cut)
+    s.theme = "paper"
+    with pytest.raises(RuntimeError):
+        user_settings.save(s)
+    monkeypatch.undo()
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    assert user_settings.load().theme == "light"

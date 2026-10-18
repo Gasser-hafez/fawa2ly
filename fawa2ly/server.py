@@ -847,7 +847,7 @@ def main(argv=None) -> int:
                         stt_vendor=a.stt_vendor, whisper_model=a.whisper_model,
                         preset=a.preset, cv=a.cv, fake_llm=a.fake_llm, fake_delay=a.fake_delay,
                         replay=a.replay, speculate=not a.no_speculate)
-    sessions = None if a.sessions is None else (a.sessions or os.path.join(user_settings.app_dir(), "sessions"))
+    sessions = None if a.sessions is None else (a.sessions or user_settings.sessions_dir())
 
     make_engine = engine_factory(base, sessions)
 

@@ -21,6 +21,7 @@ CLI has used since M2.
 
 from __future__ import annotations
 
+import glob
 import json
 import os
 import re
@@ -443,10 +444,20 @@ def load() -> Settings:
     return s
 
 
+def write_json_atomic(path: str, data, **dump_args) -> None:
+    """Write `data` as JSON so that a crash leaves the old file or the new one, never half of one.
+    settings.json is written on every slider step and every call start; a truncated one read back as
+    "no settings", and the next save made that permanent (audit F12). os.replace is atomic; the same
+    pattern as usage.py and jobfit.py."""
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, **dump_args)
+    os.replace(tmp, path)
+
+
 def save(s: Settings) -> None:
     os.makedirs(app_dir(), exist_ok=True)
-    with open(settings_path(), "w", encoding="utf-8") as f:
-        json.dump(asdict(s), f, indent=2)
+    write_json_atomic(settings_path(), asdict(s), indent=2)
 
 
 # ---- transcripts (roadmap item 6) ----
@@ -455,6 +466,11 @@ def save(s: Settings) -> None:
 
 def transcripts_dir() -> str:
     return os.path.join(app_dir(), "transcripts")
+
+
+def sessions_dir() -> str:
+    """Where the installed engine keeps each saved call's logs (server.py --sessions)."""
+    return os.path.join(app_dir(), "sessions")
 
 
 def list_transcripts() -> list[str]:
@@ -466,7 +482,12 @@ def list_transcripts() -> list[str]:
 
 
 def delete_transcripts() -> int:
-    """Delete every saved transcript (the Delete button in Settings). Returns how many went."""
+    """Delete every saved transcript (the Delete button in Settings). Returns how many went.
+
+    The call logs written beside them go too (sessions/*.jsonl: the utterances, the raw speech-to-text
+    output, the suggestions): they hold the same words, and used to outlive the button (audit F11).
+    A file of the call running right now is held open, so Windows refuses it; it stays until the
+    next Delete."""
     removed = 0
     for path in list_transcripts():
         try:
@@ -474,6 +495,11 @@ def delete_transcripts() -> int:
             removed += 1
         except OSError:
             continue
+    for path in glob.glob(os.path.join(sessions_dir(), "*.jsonl")):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
     return removed
 
 
@@ -507,8 +533,7 @@ def _read_index(mode: str) -> list[dict]:
 
 def _write_index(mode: str, entries: list[dict]) -> None:
     os.makedirs(documents_dir(mode), exist_ok=True)
-    with open(_index_path(mode), "w", encoding="utf-8") as f:
-        json.dump(entries, f, indent=2)
+    write_json_atomic(_index_path(mode), entries, indent=2)
 
 
 def _store(mode: str, name: str, text: str) -> None:
