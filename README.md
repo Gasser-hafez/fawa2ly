@@ -67,7 +67,8 @@ The mascot sits in the corner of the overlay and its face tells you what the app
 - **Professionals in meetings.** A Meeting mode, with presets for client calls, one-to-ones and
   stand-ups, plus a recap and notes afterwards.
 - **Privacy-minded users.** Bring your own key for any of a dozen providers, or run everything
-  locally with Whisper and Ollama, so nothing leaves the machine.
+  locally with Whisper and Ollama, so nothing from your calls leaves the machine (see
+  [Privacy](#privacy-stated-plainly) for what the app itself downloads: fonts, updates, the Whisper model).
 
 It is **not** for situations where outside help is forbidden. Fawa2ly does not hide from screen
 sharing or proctoring software, by design: see [What it will not do](#what-it-will-not-do).
@@ -194,14 +195,17 @@ They work from any app while Fawa2ly runs, and every one can be changed in Setti
 | What | Where it goes |
 |---|---|
 | Call audio | Streamed to Deepgram **only** if you use Deepgram for listening. Never stored. With local Whisper it stays on the machine. |
+| Speaking a role (Settings > Roles > Speak) | Your microphone is streamed to Deepgram for up to a minute, only while you speak. Refused when listening is set to this computer: type the role instead. |
 | What was said, your documents | Sent to the model provider you chose, to write the lines. With a local model (Ollama, LM Studio, …) nothing leaves the machine. |
 | Settings, documents, API keys | Plain files in `%APPDATA%\Fawa2ly` (`~/.fawa2ly` elsewhere). Keys are in `.env` there, and a saved key is never shown again. |
 | Transcripts and call logs | Written **only** if you turn on "Save a transcript of each call". Off by default. |
 | First use of local Whisper | The model downloads once from Hugging Face (about 480 MB for the default size). |
 | Update check | When it starts and every six hours, the app downloads one small file (`latest.json`) from this repository's GitHub releases to see if there is a newer version. That request carries nothing about you or your calls; GitHub sees it like any download. |
-| Telemetry | None. Apart from the update check, the app contacts nothing you did not choose. |
+| Fonts | Each window loads its two typefaces (Baloo Bhaijaan 2, IBM Plex Sans Arabic) from Google Fonts when it opens, so Google sees your IP address and browser details, as for any web font. Offline, the system font is used. |
+| Telemetry | None. Apart from the update check and the fonts, the app contacts nothing you did not choose. |
 
-The engine listens on `127.0.0.1` only and accepts connections only from its own window: see
+The engine listens on `127.0.0.1` only. Web pages cannot use it, but other programs on this
+computer can, including programs of another Windows user signed in at the same time: see
 [SECURITY.md](SECURITY.md).
 
 ## What it will not do

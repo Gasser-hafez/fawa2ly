@@ -40,10 +40,12 @@ You must make sure that your use is lawful and permitted:
 
 Fawa2ly sends data to the services you configure, using your own accounts and keys:
 
-- a speech-to-text service (Deepgram) receives the call audio, unless you use local transcription;
+- a speech-to-text service (Deepgram) receives the call audio, unless you use local transcription,
+  and your microphone while you speak a role in Settings;
 - a model provider (such as Google Gemini, Groq or Cerebras, or a local Ollama) receives the text of
   the question, recent conversation, your role and your documents;
-- on first use of local transcription, a model file is downloaded from Hugging Face.
+- on first use of local transcription, a model file is downloaded from Hugging Face;
+- each window loads its fonts from Google Fonts when it opens.
 
 Those services have their own terms and privacy policies, and their own costs. We do not operate
 them, receive your data through them, or control what they do with it. Do not send them anything you

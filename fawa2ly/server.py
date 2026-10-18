@@ -413,6 +413,14 @@ class SessionServer:
             await ws.send(json.dumps({"type": "error", "text": "already listening"}))
             return
         s = user_settings.load()
+        if s.stt_vendor == "whisper":
+            # Speaking a role uses Deepgram; a user who set listening to this computer chose that
+            # nothing they say leaves it (README "Privacy"), so the microphone is not streamed out
+            # behind that choice (audit F10).
+            await ws.send(json.dumps({"type": "dictation", "state": "error",
+                                      "text": "Speaking the role uses Deepgram, and Listening is set to "
+                                              "this computer: type the role instead."}))
+            return
 
         def forward(event: dict) -> None:
             asyncio.ensure_future(ws.send(json.dumps(event, ensure_ascii=False)))

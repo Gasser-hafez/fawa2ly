@@ -18,7 +18,10 @@ You should get an answer within a week.
   `tests/test_server_security.py`.
 - **Other programs on the same machine** can still connect, because there is no token. A process
   running as you can already read the app folder, the keys in it and the transcripts, so this adds
-  little, but treat the machine as trusted.
+  little, but treat the machine as trusted. That includes **other Windows users signed in to the
+  same PC at the same time** (fast user switching, a shared or remote desktop): loopback is shared
+  between them, so their programs, or their own copy of Fawa2ly, can reach your running engine. Until
+  there is a per-launch token, avoid running Fawa2ly while another user is signed in to the PC.
 - API keys are stored in plain text in `.env` inside the app folder (`%APPDATA%\Fawa2ly`). The
   settings window is only ever told whether a key is set, never its value.
 - Documents and, if you enable saving, transcripts are stored unencrypted in the app folder.

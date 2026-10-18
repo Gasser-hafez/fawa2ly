@@ -451,3 +451,28 @@ def test_a_cli_flag_beats_the_saved_speech_choice_and_the_saved_choice_fills_the
     assert (saved.stt_vendor, saved.whisper_model) == ("whisper", "base")
     mixed = config_from(EngineConfig(whisper_model="tiny"), {})
     assert (mixed.stt_vendor, mixed.whisper_model) == ("whisper", "tiny")
+
+
+def test_speaking_a_role_is_refused_when_listening_is_set_to_this_computer(monkeypatch):
+    """Audit F10: Dictation always streamed the microphone to Deepgram, even for a user who set
+    listening to local Whisper so that nothing they say leaves the machine."""
+    from fawa2ly import server as server_mod
+    from fawa2ly import settings as user_settings
+
+    opened = []
+    monkeypatch.setattr(server_mod, "Dictation", lambda *a, **k: opened.append(1))
+    s = user_settings.load()
+    s.stt_vendor = "whisper"
+    user_settings.save(s)
+
+    async def go():
+        server = make_server()
+        task = await start(server)
+        async with connect(f"ws://127.0.0.1:{server.port}") as ws:
+            await ws.send(json.dumps({"cmd": "dictate", "action": "start"}))
+            got = await wait_for(ws, lambda e: e["type"] == "dictation")
+            assert got["state"] == "error" and "Deepgram" in got["text"]
+        task.cancel()
+
+    asyncio.run(go())
+    assert not opened, "no Deepgram connection was opened"
