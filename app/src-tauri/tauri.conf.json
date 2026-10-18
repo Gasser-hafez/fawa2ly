@@ -37,5 +37,16 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZFMzAxQjRBNEM0QkMyQzEKUldUQndrdE1TaHN3YnVEcDZwUXZDZTQrcCtvd21leHRhR2psTW5jL3YySzhBc2l2aUZDTWs5YjkK",
+      "endpoints": [
+        "https://github.com/Gasser-hafez/fawa2ly/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

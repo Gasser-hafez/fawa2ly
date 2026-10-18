@@ -2,6 +2,11 @@ name: Release
 
 # Pushing a tag such as v0.1.0 builds the Windows installer and publishes it as a GitHub release.
 # Run it by hand (Actions > Release > Run workflow) to build the installer without publishing.
+#
+# The release also carries what the installed app needs to update itself (src-tauri/src/update.rs):
+# the installer's signature (.sig) and latest.json, which names the version, its notes and where
+# the installer is. The app reads latest.json from the latest release, so releases are published as
+# latest, not as pre-releases: GitHub leaves pre-releases out of /releases/latest.
 on:
   push:
     tags: ["v*"]
@@ -15,6 +20,27 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
+      # The tag has to name the version the app reports; otherwise every install would see itself
+      # as out of date and offer the same update forever.
+      - name: Version
+        shell: pwsh
+        run: |
+          $v = (Get-Content app/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          if ($env:GITHUB_REF -like "refs/tags/v*" -and "v$v" -ne $env:GITHUB_REF_NAME) {
+            throw "The tag $env:GITHUB_REF_NAME does not match version $v in app/src-tauri/tauri.conf.json"
+          }
+          "VERSION=$v" | Out-File -Append -Encoding ascii $env:GITHUB_ENV
+
+      # Updates are signed: the app installs nothing whose signature does not match its public key.
+      - name: Signing key
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
+            throw "Add the TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD secrets: see docs/RELEASING.md"
+          }
 
       - uses: actions/setup-python@v5
         with:
@@ -43,6 +69,9 @@ jobs:
         working-directory: app
       - run: npx tauri build --config src-tauri/tauri.bundle.json
         working-directory: app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: Checksum
         shell: pwsh
@@ -53,20 +82,46 @@ jobs:
           "$hash  $($setup.Name)" | Out-File -Encoding ascii "$($setup.FullName).sha256"
           "SETUP=$($setup.FullName)" | Out-File -Append -Encoding ascii $env:GITHUB_ENV
 
+      - name: Release notes and latest.json
+        shell: pwsh
+        run: |
+          $setup = Get-Item $env:SETUP
+          $sig = "$($setup.FullName).sig"
+          if (-not (Test-Path $sig)) { throw "no update signature was produced next to $($setup.Name)" }
+          python packaging/release_notes.py $env:VERSION | Out-File -Encoding utf8 notes.md
+          $latest = [ordered]@{
+            version   = $env:VERSION
+            notes     = (Get-Content notes.md -Raw).Trim()
+            pub_date  = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            platforms = @{
+              "windows-x86_64" = @{
+                signature = (Get-Content $sig -Raw).Trim()
+                url       = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/v$env:VERSION/$($setup.Name)"
+              }
+            }
+          }
+          $latest | ConvertTo-Json -Depth 5 | Out-File -Encoding utf8 latest.json
+          Get-Content latest.json
+
       - uses: actions/upload-artifact@v4
         with:
           name: fawa2ly-windows-installer
           path: |
             ${{ env.SETUP }}
             ${{ env.SETUP }}.sha256
+            ${{ env.SETUP }}.sig
+            latest.json
 
       - name: Publish the release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           name: Fawa2ly ${{ github.ref_name }}
-          body_path: CHANGELOG.md
-          prerelease: true          # until someone outside the author has installed it
+          body_path: notes.md
+          prerelease: false         # the app looks for updates in the latest release only
+          make_latest: true
           files: |
             ${{ env.SETUP }}
             ${{ env.SETUP }}.sha256
+            ${{ env.SETUP }}.sig
+            latest.json

@@ -23,6 +23,11 @@ You should get an answer within a week.
   settings window is only ever told whether a key is set, never its value.
 - Documents and, if you enable saving, transcripts are stored unencrypted in the app folder.
 - Call audio is never written to disk.
+- **Updates are signed.** The app downloads `latest.json` from this repository's latest GitHub
+  release and installs a newer version only when the user asks, and only if the installer's
+  signature matches the public key built into the app (`app/src-tauri/tauri.conf.json`). The
+  private key is kept off the repository, in the maintainer's hands and in a GitHub Actions secret
+  used by the release workflow (docs/RELEASING.md).
 
 ## Out of scope
 

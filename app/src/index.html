@@ -91,6 +91,15 @@
         </section>
 
         <section id="setup" hidden>
+          <div id="update-card" class="update-card" hidden>
+            <b id="update-title">A new version is ready</b>
+            <p id="update-note"></p>
+            <div class="update-bar" id="update-bar" hidden><i></i></div>
+            <div class="actions">
+              <button type="button" class="primary" id="update-now">Update and restart</button>
+              <button type="button" id="update-later">Later</button>
+            </div>
+          </div>
           <h1>Set up this call</h1>
 
           <label class="field">
@@ -160,6 +169,7 @@
             <button type="button" class="primary" id="start">Start listening</button>
           </div>
           <p id="setup-error" class="error" hidden></p>
+          <p id="app-version" class="version-line" hidden></p>
         </section>
 
         <section id="current" data-phase="waiting" hidden>
@@ -200,6 +210,7 @@
     </div>
 
     <script src="chrome.js"></script>
+    <script src="updates.js"></script>
     <script type="module" src="main.js"></script>
   </body>
 </html>

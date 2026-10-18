@@ -11,6 +11,8 @@
 // hidden page cannot show its own window) and click-through (a page that ignores the mouse cannot
 // be clicked to stop). Every other action is sent to the overlay as a `hotkey` event.
 //
+// Updates live in update.rs: checking GitHub for a newer signed installer and installing it.
+//
 // And starting the engine (M3 step 5): the installed app ships the packaged engine as a resource
 // and starts it here, because a user has no terminal to start it from.
 use std::collections::HashMap;
@@ -22,6 +24,8 @@ use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, Manager, RunEvent};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+
+mod update;
 
 // Registered at launch, before the engine has said anything, so the window can always be shown
 // and hidden. The overlay replaces them with the user's choices once it connects.
@@ -52,8 +56,18 @@ struct Hotkeys {
     applying: Mutex<()>,
 }
 
-/// The engine this app started, stopped when the app exits.
-struct EngineProcess(Mutex<Option<Child>>);
+/// The engine this app started, stopped when the app exits or an update is installed.
+pub(crate) struct EngineProcess(pub(crate) Mutex<Option<Child>>);
+
+/// Stop the engine this app started, if any; one started from a terminal is not ours to stop.
+pub(crate) fn stop_engine(app: &AppHandle) {
+    if let Some(state) = app.try_state::<EngineProcess>() {
+        if let Some(mut child) = state.0.lock().unwrap().take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
 
 /// Make the registered hotkeys match `wanted` (action -> combination; empty means unassigned).
 /// Returns action -> "" for each one in place, or why it is not: a combination the parser
@@ -162,7 +176,7 @@ fn set_hotkeys(app: AppHandle, hotkeys: HashMap<String, String>) -> HashMap<Stri
 /// installer resources). It runs from its own folder, logs each call to the app's sessions folder
 /// (only while the user has transcript saving on), and writes its console to
 /// %APPDATA%\Fawa2ly\engine.log, the first thing to ask for when nothing connects.
-fn start_engine(app: &AppHandle) -> Option<Child> {
+pub(crate) fn start_engine(app: &AppHandle) -> Option<Child> {
     let addr: SocketAddr = ENGINE_ADDR.parse().ok()?;
     if TcpStream::connect_timeout(&addr, Duration::from_millis(300)).is_ok() {
         return None;
@@ -260,7 +274,13 @@ pub fn run() {
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![set_hotkeys])
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .invoke_handler(tauri::generate_handler![
+            set_hotkeys,
+            update::check_update,
+            update::update_status,
+            update::install_update
+        ])
         .setup(|app| {
             app.manage(Hotkeys {
                 table: Mutex::new(HashMap::new()),
@@ -277,20 +297,17 @@ pub fn run() {
             }
             let engine = start_engine(app.handle());
             app.manage(EngineProcess(Mutex::new(engine)));
+            app.manage(update::Pending(Mutex::new(None)));
+            update::watch(app.handle().clone());
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
     app.run(|app, event| {
-        // The engine this app started goes with it; one started from a terminal is not ours to stop.
+        // The engine this app started goes with it.
         if let RunEvent::Exit = event {
-            if let Some(state) = app.try_state::<EngineProcess>() {
-                if let Some(mut child) = state.0.lock().unwrap().take() {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                }
-            }
+            stop_engine(app);
         }
     });
 }

@@ -170,6 +170,12 @@ Everything else lives in one Settings window, in five groups.
 - The mascot is the status light: listening, thinking, answering, or knocked flat when something
   broke.
 
+**Updates**
+- The app shows its version and checks for a new one when it starts and every six hours.
+- A new version is offered between calls, never during one, with what is new in it, and installs
+  with one click: the app closes, updates and reopens by itself.
+- Every update is signed, and the app refuses one whose signature does not match.
+
 ## Hotkeys
 
 They work from any app while Fawa2ly runs, and every one can be changed in Settings.
@@ -192,7 +198,8 @@ They work from any app while Fawa2ly runs, and every one can be changed in Setti
 | Settings, documents, API keys | Plain files in `%APPDATA%\Fawa2ly` (`~/.fawa2ly` elsewhere). Keys are in `.env` there, and a saved key is never shown again. |
 | Transcripts and call logs | Written **only** if you turn on "Save a transcript of each call". Off by default. |
 | First use of local Whisper | The model downloads once from Hugging Face (about 480 MB for the default size). |
-| Telemetry | None. The app does not phone home. |
+| Update check | When it starts and every six hours, the app downloads one small file (`latest.json`) from this repository's GitHub releases to see if there is a newer version. That request carries nothing about you or your calls; GitHub sees it like any download. |
+| Telemetry | None. Apart from the update check, the app contacts nothing you did not choose. |
 
 The engine listens on `127.0.0.1` only and accepts connections only from its own window: see
 [SECURITY.md](SECURITY.md).
@@ -213,6 +220,10 @@ and interview; know the ones that apply to you before you use it.
    choose **More info**, then **Run anyway**. It installs for the current user and needs no
    administrator rights.
 3. Open Fawa2ly. The installed app starts its own engine; no Python or terminal needed.
+
+You only install once. When a new version comes out, Fawa2ly shows **Fawa2ly x.y.z is ready** on
+its setup screen; press **Update and restart**. Your settings, documents and keys stay as they
+are. You can also check any time in Settings > Look, hotkeys, updates.
 
 ## Your first call
 
@@ -262,8 +273,8 @@ python -m fawa2ly.server --replay demo.raw.jsonl --suggest --fake-llm
 python -m http.server 5173 --directory app/src      # then open http://127.0.0.1:5173/index.html
 ```
 
-Build the installer: see [app/README.md](app/README.md#building-the-installer) and
-[docs/RELEASING.md](docs/RELEASING.md).
+Build the installer: see [app/README.md](app/README.md#building-the-installer). Publish a release,
+which every installed copy then offers as an update: see [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Under the hood
 

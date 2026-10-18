@@ -745,6 +745,43 @@ if (window.__TAURI__ && window.__TAURI__.event) {
   window.__TAURI__.event.listen("click-through", (e) => { el.clickThrough.hidden = !e.payload; });
 }
 
+/* ---------- updates (release 0.1.0) ----------
+   updates.js knows what is waiting; this draws it. A new version is offered on the setup screen,
+   between calls, never over one: during a call only the dot on the settings button shows it. */
+const upd = {};
+for (const id of ["update-card", "update-title", "update-note", "update-bar", "update-now", "update-later",
+                  "app-version"]) upd[id] = document.getElementById(id);
+let laterFor = null;              // what Later was pressed for, this session: a version, or "failed"
+
+function renderUpdate(s) {
+  const u = s.update;
+  const working = s.phase === "downloading" || s.phase === "installing";
+  const failed = s.phase === "error" && s.failed === "install";
+  el.openSettings.classList.toggle("has-update", Boolean(u));
+  upd["app-version"].hidden = !s.version;
+  if (s.version) upd["app-version"].textContent = `Version ${s.version}`;
+  const show = working || (failed && laterFor !== "failed") || (u && laterFor !== u.version);
+  upd["update-card"].hidden = !show;
+  if (!show) return;
+  const pct = s.phase === "installing" ? 100 : s.total ? Math.round((s.received / s.total) * 100) : null;
+  upd["update-title"].textContent = failed ? "The update did not install" : `Fawa2ly ${u.version} is ready`;
+  upd["update-note"].textContent = failed ? s.error
+    : s.phase === "installing" ? "Installing. Fawa2ly closes and opens again by itself."
+    : s.phase === "downloading" ? (pct === null ? "Downloading" : `Downloading, ${pct}%`)
+    : `You have ${u.current}. Updating takes a minute and reopens the app.`;
+  upd["update-bar"].hidden = !working;
+  upd["update-bar"].firstElementChild.style.width = `${pct || 0}%`;
+  upd["update-now"].hidden = working || failed;
+  upd["update-later"].hidden = working;
+}
+window.fawa2lyUpdates.subscribe(renderUpdate);
+upd["update-now"].addEventListener("click", () => window.fawa2lyUpdates.install());
+upd["update-later"].addEventListener("click", () => {
+  const s = window.fawa2lyUpdates.state;
+  laterFor = s.update ? s.update.version : "failed";
+  renderUpdate(s);
+});
+
 /* ---------- global hotkeys (roadmap item 3) ---------- */
 
 // The engine stores the combinations; the window registers them. Registration is redone only when

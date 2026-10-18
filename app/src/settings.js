@@ -61,7 +61,7 @@ const GROUPS = {
   you: ["roles", "documents"],
   calls: ["calls"],
   model: ["model", "keys", "usage"],
-  app: ["display", "hotkeys"],
+  app: ["display", "hotkeys", "updates"],
 };
 const groupOf = (name) => Object.keys(GROUPS).find((g) => g === name || GROUPS[g].includes(name)) || "call";
 
@@ -1254,6 +1254,41 @@ function connect() {
   });
   socket.addEventListener("error", () => socket.close());
 }
+
+/* ---------- updates (release 0.1.0) ----------
+   updates.js knows what is waiting and does the work; this draws it, in the Updates section and at
+   the foot of the sidebar, where a waiting update is a button that opens that section. */
+function renderUpdate(s) {
+  const u = s.update;
+  const working = s.phase === "downloading" || s.phase === "installing";
+  const pct = s.phase === "installing" ? 100 : s.total ? Math.round((s.received / s.total) * 100) : null;
+  const on = window.fawa2lyUpdates.available;
+  $("upd-browser").hidden = on;
+  $("upd-check").hidden = !on;
+  $("upd-check").disabled = s.phase === "checking" || working;
+  $("upd-install").hidden = !u || working;
+  $("upd-version").textContent = s.version || "-";
+  $("foot-version").hidden = !s.version;
+  if (s.version) $("foot-version").textContent = `Version ${s.version}`;
+  $("foot-update").hidden = !u;
+  if (u) $("foot-update").textContent = `Fawa2ly ${u.version} is ready`;
+  $("upd-notes-wrap").hidden = !(u && u.notes);
+  $("upd-notes").textContent = u ? u.notes : "";
+  $("upd-bar").hidden = !working;
+  $("upd-bar").firstElementChild.style.width = `${pct || 0}%`;
+  $("upd-state").textContent = {
+    checking: "Checking for updates",
+    latest: "You have the newest version.",
+    ready: u ? `Fawa2ly ${u.version} is ready` : "",
+    downloading: pct === null ? "Downloading the update" : `Downloading the update, ${pct}%`,
+    installing: "Installing. Fawa2ly closes and opens again by itself.",
+    error: s.failed === "check" ? `Could not check for updates: ${s.error}` : `The update did not install: ${s.error}`,
+  }[s.phase] || "Checked when Fawa2ly starts and every few hours.";
+}
+window.fawa2lyUpdates.subscribe(renderUpdate);
+$("upd-check").addEventListener("click", () => window.fawa2lyUpdates.check());
+$("upd-install").addEventListener("click", () => window.fawa2lyUpdates.install());
+$("foot-update").addEventListener("click", () => showSection("updates"));
 
 showSection(section);
 connect();
