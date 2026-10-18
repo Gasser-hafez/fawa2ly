@@ -137,3 +137,26 @@ def test_guardrail_keeps_spoken_sentences_and_drops_cv_labels():
 def test_dropped_is_a_plain_record():
     d = Dropped("x", "too_long")
     assert (d.text, d.reason) == ("x", "too_long")
+
+
+def test_preset_files_are_parsed_once_until_they_change(tmp_path, monkeypatch):
+    """Audit F16: every settings event re-read ~70 role files twice on the event loop. A file is
+    parsed again only when it changes, and a new or edited role is seen at once."""
+    import os
+
+    import yaml as yaml_module
+
+    from fawa2ly.context import builder
+
+    (tmp_path / "a.yaml").write_text("role: First\nmode: interview\n", encoding="utf-8")
+    parsed = []
+    real = yaml_module.safe_load
+    monkeypatch.setattr(builder.yaml, "safe_load", lambda f: parsed.append(1) or real(f))
+    assert builder.preset_info(str(tmp_path))["a"]["title"] == "First"
+    assert builder.available_modes(str(tmp_path)) == {"a": "interview"}
+    assert len(parsed) == 1, "the second read of an unchanged file is the cached one"
+    (tmp_path / "a.yaml").write_text("role: Second, longer\nmode: meeting\n", encoding="utf-8")
+    (tmp_path / "b.yaml").write_text("role: New\n", encoding="utf-8")
+    assert builder.preset_info(str(tmp_path))["a"]["title"] == "Second, longer"
+    assert builder.available_modes(str(tmp_path)) == {"a": "meeting", "b": "interview"}
+    assert os.path.exists(tmp_path / "b.yaml") and len(parsed) == 3

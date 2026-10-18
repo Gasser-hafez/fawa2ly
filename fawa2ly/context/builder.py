@@ -45,6 +45,24 @@ def bundled_path(*parts: str) -> str:
 PRESET_DIR = "presets" if os.path.isdir("presets") else bundled_path("presets")
 DEFAULT_HISTORY_TURNS = 6
 
+# Every settings event lists each role's mode and title, which read all ~70 preset files twice
+# (about 180 ms on the event loop, per slider step, mid-call too: audit F16). A file is parsed again
+# only when its size or modification time changes, so a role added or edited is seen at once.
+_YAML_CACHE: dict[str, tuple[tuple[int, int], dict]] = {}
+
+
+def read_preset_file(path: str) -> dict:
+    """A preset file's YAML as a dict, cached by (mtime, size). Callers must not modify it."""
+    st = os.stat(path)
+    stamp = (st.st_mtime_ns, st.st_size)
+    hit = _YAML_CACHE.get(path)
+    if hit is not None and hit[0] == stamp:
+        return hit[1]
+    with open(path, encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    _YAML_CACHE[path] = (stamp, data)
+    return data
+
 
 @dataclass
 class Preset:
@@ -62,8 +80,7 @@ class Preset:
 
     @classmethod
     def load(cls, path: str) -> "Preset":
-        with open(path, encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
+        data = read_preset_file(path)
         stem = os.path.splitext(os.path.basename(path))[0]
         return cls.from_dict(data, name=stem)
 
@@ -232,8 +249,7 @@ def preset_info(preset_dir: str = PRESET_DIR) -> dict[str, dict]:
             if ext not in (".yaml", ".yml") or name in out:
                 continue
             try:
-                with open(os.path.join(folder, f), encoding="utf-8") as fh:
-                    data = yaml.safe_load(fh) or {}
+                data = read_preset_file(os.path.join(folder, f))
             except (OSError, yaml.YAMLError):
                 continue
             out[name] = {"title": str(data.get("title") or data.get("role") or name), "custom": custom,

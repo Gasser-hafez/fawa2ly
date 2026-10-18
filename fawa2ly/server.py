@@ -442,9 +442,7 @@ class SessionServer:
         except ValueError as e:
             await ws.send(json.dumps({"type": "error", "text": str(e)}))
             return
-        self.publish({"type": "settings", "settings": user_settings.load().to_json(),
-                      "providers": available_providers(), "presets": available(),
-                      "preset_modes": available_modes(), "preset_info": preset_info()})
+        self._publish_settings()
 
     async def handle_provider_config(self, ws, cmd: str, msg: dict) -> None:
         """The API keys page (2026-10-16): change a provider, add an OpenAI-compatible endpoint (and
@@ -672,8 +670,7 @@ class SessionServer:
         for k, v in changed.items():
             setattr(s, k, v)
         user_settings.save(s)
-        self.publish({"type": "settings", "settings": s.to_json(), "providers": available_providers(),
-                      "presets": available(), "preset_modes": available_modes(), "preset_info": preset_info()})
+        self._publish_settings()
 
     def _documents_changed(self, mode: str) -> None:
         """A document was added or removed. Between calls that redraws the setup screen. During a
@@ -683,9 +680,7 @@ class SessionServer:
         if self.running and self.engine is not None:
             if getattr(self.engine, "mode", None) == mode and hasattr(self.engine, "set_documents"):
                 self.engine.set_documents(user_settings.load_documents(mode))
-            self.publish({"type": "settings", "settings": user_settings.load().to_json(),
-                          "providers": available_providers(), "presets": available(),
-                          "preset_modes": available_modes(), "preset_info": preset_info()})
+            self._publish_settings()
         else:
             self.idle()
 
