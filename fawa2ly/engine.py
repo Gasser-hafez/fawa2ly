@@ -10,7 +10,10 @@ that bug, so the second front end does not get its own wiring.
 
 Everything a front end needs arrives through one callback as a plain dict with a "type":
 
-    status      the engine came up, paused or went down; devices, provider, log paths
+    status      the engine came up, paused or went down; devices, provider, log paths. `stopped` is
+                the last one of every call and carries `error` when the call ended for a reason the
+                user did not give: a speech stream died mid-call (sent here, after the summary), or
+                the call never started (sent by the server from what run() raised).
     log         a line of console text, already formatted (keeps the CLI byte-identical)
     interim     partial transcript for a live caption, replaced as it grows
     piece       one completed sentence from the pipeline, with its speaker
@@ -41,6 +44,8 @@ import time
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from typing import Callable, Optional
+
+from websockets.exceptions import InvalidStatus
 
 from .assist import Suggester
 from .audio import to_16k_mono
@@ -325,6 +330,72 @@ class Engine:
     def _log(self, text: str = "", end: str = "\n", flush: bool = False) -> None:
         self.emit({"type": "log", "text": text, "end": end})
 
+    # ---- teardown: what is always let go, and why a call ended ----
+    def _quiet(self, release, *args) -> None:
+        """Run one release step so that its failing cannot stop the steps after it: a device that
+        has gone must not leave the session files open."""
+        try:
+            release(*args)
+        except Exception as e:
+            self._log(f"[cleanup] {getattr(release, '__name__', 'a step')} failed: {e}")
+
+    @staticmethod
+    def _stop_stream(stream) -> None:
+        try:
+            stream.stop_stream()
+        finally:
+            stream.close()
+
+    async def _drain(self) -> None:
+        """Let the last suggestions land before the files they write to close, then close the
+        models. One still running after SUGGEST_DRAIN_S is cancelled: left alone it would later
+        write into a log that is closed by then."""
+        try:
+            if self._pending:
+                _, late = await asyncio.wait(self._pending, timeout=SUGGEST_DRAIN_S)
+                for task in late:
+                    task.cancel()
+            if self.provider is not None:
+                await self._close_providers()
+        except Exception as e:
+            self._log(f"[cleanup] closing the model connections failed: {e}")
+
+    def _end(self, error: str = "") -> None:
+        """The last thing a call that got as far as listening does: its summary, then `stopped`,
+        carrying the reason when the call did not end because the user (or `seconds`) said so."""
+        self._finish()
+        event = {"type": "status", "state": "stopped"}
+        if error:
+            event["error"] = error
+        self.emit(event)
+
+    @staticmethod
+    def _why_ended(task: asyncio.Task, tag: str) -> str:
+        """For a window: which side's speech stream stopped on its own, and what it said."""
+        who = "your microphone" if tag == "user" else "the call"
+        exc = None if task.cancelled() else task.exception()
+        detail = (str(exc) or type(exc).__name__) if exc is not None else "the connection was closed"
+        return f"Speech recognition stopped ({who}): {detail}"
+
+    async def _wait_until_over(self, streams: dict) -> str:
+        """Wait for the user to end the call, for `seconds` to run out, or for one of the stream
+        tasks (task -> "other" | "user") to finish by itself. Returns "" for the first two and the
+        reason for the third, which used to look exactly like the first: a dropped speech
+        connection ended the call with a clean "Call ended" and nothing said (audit F3)."""
+        stopper = asyncio.create_task(self._stop.wait())
+        try:
+            done, _ = await asyncio.wait([*streams, stopper], timeout=self.cfg.seconds or None,
+                                         return_when=asyncio.FIRST_COMPLETED)
+        except (asyncio.CancelledError, KeyboardInterrupt):
+            return ""
+        finally:
+            stopper.cancel()
+        if stopper in done or not done:
+            return ""
+        # the one that raised first; sorting reads every exception, so none is left unretrieved
+        died = sorted(done, key=lambda t: t.cancelled() or t.exception() is None)[0]
+        return self._why_ended(died, streams[died])
+
     def _role_title(self) -> str:
         if not self.cfg.preset:
             return ""
@@ -356,6 +427,7 @@ class Engine:
                             token_delay=0.35 if self.cfg.fake_delay else 0.002)
                     if self.cfg.fake_llm
                     else MeteredProvider(OpenAICompatibleLLM.from_env(self.cfg.vendor, self.cfg.llm_model)))
+        self.provider = provider          # held at once, so a failure below (a missing role) still closes it
         cv_text = self.cfg.cv_text or (load_cv(self.cfg.cv) if self.cfg.cv else "")
         builder = ContextBuilder(preset=Preset.find(self.cfg.preset) if self.cfg.preset else None,
                                  cv_text=cv_text, style=self.cfg.style, mode=self.cfg.mode,
@@ -363,7 +435,6 @@ class Engine:
         # rehearsal7 ran with no background at all and nothing on screen said so: every status from
         # here carries how much background the model actually has, so the overlay can
         self.cv_words = len(builder.cv_text.split())
-        self.provider = provider
         builder.negotiation = self.cfg.negotiation     # roadmap item 25, off unless turned on
         return Suggester(provider, builder, log=assist_log,
                          on_result=lambda a: self.emit({"type": "assist", "assist": a.to_json()}),
@@ -431,13 +502,21 @@ class Engine:
                        on_utterance=lambda u: self.emit({"type": "utterance", "utterance": u.to_json()}),
                        on_interim=on_interim)
 
-    async def _open_side_files(self):
-        """(utterance log, assist log). The suggester is built here too when asked for."""
+    async def _open_side_files(self, stack: AsyncExitStack):
+        """(utterance log, assist log). The suggester is built here too when asked for.
+
+        Each thing is registered with `stack` the moment it exists, so a step after it failing (a
+        model with no key, a role that is not there) does not leave the files open. `_drain` is
+        registered after the files, so it runs before they close."""
         log = open(self.cfg.log_path, "a", encoding="utf-8")
+        stack.callback(self._quiet, log.close)
         assist_log = None
         if self.cfg.suggest:
             assist_log = open(side_path(self.cfg.log_path, ".assist.jsonl"),
                               "a", encoding="utf-8")
+            stack.callback(self._quiet, assist_log.close)
+        stack.push_async_callback(self._drain)
+        if self.cfg.suggest:
             self.suggester = self._build_suggester(assist_log)
             self.coach = self._coach_if_asked()
         return log, assist_log
@@ -452,32 +531,28 @@ class Engine:
         """
         safe_console()
         mute_asyncgen_close_noise()
-        log, assist_log = await self._open_side_files()
-        self.emit({"type": "status", "state": "listening", "log": self.cfg.log_path,
-                   "provider": None if self.provider is None
-                   else f"{self.provider.name}/{self.provider.model}",
-                   "replay": self.cfg.replay, "cv_words": self.cv_words, "style": self.cfg.style,
-                   "mode": self.suggester.builder.mode if self.suggester is not None else self.cfg.mode})
-        task = asyncio.create_task(self._consumer(_Pausable(FakeSTT(self.cfg.replay, realtime=True), self),
-                                                  "other", log))
-        stopper = asyncio.create_task(self._stop.wait())
+        listening = False
         try:
-            # `seconds` has to mean the same here as it does live, or a smoke test that passes
-            # against a device hangs forever against a recording (found the hard way, 2026-09-10)
-            await asyncio.wait([task, stopper], timeout=self.cfg.seconds or None,
-                               return_when=asyncio.FIRST_COMPLETED)
+            async with AsyncExitStack() as stack:
+                log, _ = await self._open_side_files(stack)
+                self.emit({"type": "status", "state": "listening", "log": self.cfg.log_path,
+                           "provider": None if self.provider is None
+                           else f"{self.provider.name}/{self.provider.model}",
+                           "replay": self.cfg.replay, "cv_words": self.cv_words, "style": self.cfg.style,
+                           "mode": self.suggester.builder.mode if self.suggester is not None else self.cfg.mode})
+                listening = True
+                task = asyncio.create_task(self._consumer(
+                    _Pausable(FakeSTT(self.cfg.replay, realtime=True), self), "other", log))
+                stack.callback(task.cancel)
+                stopper = asyncio.create_task(self._stop.wait())
+                stack.callback(stopper.cancel)
+                # `seconds` has to mean the same here as it does live, or a smoke test that passes
+                # against a device hangs forever against a recording (found the hard way, 2026-09-10)
+                await asyncio.wait([task, stopper], timeout=self.cfg.seconds or None,
+                                   return_when=asyncio.FIRST_COMPLETED)
         finally:
-            stopper.cancel()
-            task.cancel()
-            if self._pending:
-                await asyncio.wait(self._pending, timeout=SUGGEST_DRAIN_S)
-            if self.provider is not None:
-                await self._close_providers()
-            log.close()
-            if assist_log is not None:
-                assist_log.close()
-            self._finish()
-            self.emit({"type": "status", "state": "stopped"})
+            if listening:                    # a call that never got as far as listening has no summary
+                self._end()
 
     async def run(self) -> None:
         if self.cfg.replay:
@@ -497,72 +572,70 @@ class Engine:
         safe_console()
         mute_asyncgen_close_noise()
 
-        pa = pyaudio.PyAudio()
-        dev, is_loopback = pick_device(pa, cfg.mic, cfg.speaker_device, cfg.mic_device)
-        devices = [("other", dev, "LOOPBACK" if is_loopback else "MIC")]
-        if cfg.user_mic:
-            devices.append(("user", find_input(pa, cfg.mic_device), "MIC"))
-        for tag, d, kind in devices:
-            self.emit({"type": "status", "state": "device", "stream": tag, "kind": kind,
-                       "name": d["name"], "rate": int(d["defaultSampleRate"]),
-                       "channels": int(d["maxInputChannels"])})
-            self._log(f"[audio] {tag:<5} {kind}: {d['name']} | "
-                      f"{int(d['defaultSampleRate'])} Hz x {int(d['maxInputChannels'])}ch")
+        listening, ended = False, ""
+        try:
+            # Everything the call holds is registered with the stack the moment it exists, and the
+            # stack lets go in the opposite order: when the call ends, when a speech stream dies, and
+            # when setup fails halfway (a second microphone that will not open, a rejected key). The
+            # try used to begin after PortAudio, the files and the first connection were all open,
+            # so a failed start leaked them, and again on every retry (audit F2).
+            async with AsyncExitStack() as stack:
+                pa = pyaudio.PyAudio()
+                stack.callback(self._quiet, pa.terminate)
+                dev, is_loopback = pick_device(pa, cfg.mic, cfg.speaker_device, cfg.mic_device)
+                devices = [("other", dev, "LOOPBACK" if is_loopback else "MIC")]
+                if cfg.user_mic:
+                    devices.append(("user", find_input(pa, cfg.mic_device), "MIC"))
+                for tag, d, kind in devices:
+                    self.emit({"type": "status", "state": "device", "stream": tag, "kind": kind,
+                               "name": d["name"], "rate": int(d["defaultSampleRate"]),
+                               "channels": int(d["maxInputChannels"])})
+                    self._log(f"[audio] {tag:<5} {kind}: {d['name']} | "
+                              f"{int(d['defaultSampleRate'])} Hz x {int(d['maxInputChannels'])}ch")
 
-        loop = asyncio.get_running_loop()
-        log, assist_log = await self._open_side_files()
-        raws, streams, tasks = [], [], []
-        async with AsyncExitStack() as stack:
-            for tag, d, _ in devices:
-                raw = open(raw_path_for(cfg.raw(), tag), "a", encoding="utf-8")
-                raws.append(raw)
-                if local_stt:
-                    stt = await stack.enter_async_context(
-                        LocalWhisperSTT(cfg.lang, raw_log=raw, model_size=cfg.whisper_model))
-                else:
-                    stt = await stack.enter_async_context(DeepgramSTT(key, cfg.lang, raw_log=raw,
-                                                                      **stt_params(tag, cfg.lang)))
-                # open the audio stream only AFTER the socket is up, so no audio backlog piles up
-                # (a backlog makes Deepgram's audio clock run ahead of our wall clock -> wrong latency)
-                queue: asyncio.Queue = asyncio.Queue()
-                streams.append(start_capture(pa, d, loop, queue))
-                tasks += [asyncio.create_task(self._pump(queue, stt)),
-                          asyncio.create_task(self._consumer(stt, tag, log))]
+                loop = asyncio.get_running_loop()
+                log, assist_log = await self._open_side_files(stack)
+                streams: dict = {}        # the pump and consumer tasks -> the side they listen to
+                for tag, d, _ in devices:
+                    raw = open(raw_path_for(cfg.raw(), tag), "a", encoding="utf-8")
+                    stack.callback(self._quiet, raw.close)
+                    try:
+                        if local_stt:
+                            stt = await stack.enter_async_context(
+                                LocalWhisperSTT(cfg.lang, raw_log=raw, model_size=cfg.whisper_model))
+                        else:
+                            stt = await stack.enter_async_context(
+                                DeepgramSTT(key, cfg.lang, raw_log=raw, **stt_params(tag, cfg.lang)))
+                    except InvalidStatus as e:     # the socket's own message does not say it is the key
+                        code = e.response.status_code
+                        raise RuntimeError(
+                            f"Deepgram refused the connection (HTTP {code})"
+                            + (": check the key under Settings > API keys." if code in (401, 403) else ".")) from e
+                    # open the audio stream only AFTER the socket is up, so no audio backlog piles up
+                    # (a backlog makes Deepgram's audio clock run ahead of our wall clock -> wrong latency)
+                    queue: asyncio.Queue = asyncio.Queue()
+                    stack.callback(self._quiet, self._stop_stream, start_capture(pa, d, loop, queue))
+                    for coro in (self._pump(queue, stt), self._consumer(stt, tag, log)):
+                        task = asyncio.create_task(coro)
+                        stack.callback(task.cancel)
+                        streams[task] = tag
 
-            self._log(f"[log] utterances -> {cfg.log_path} | raw -> "
-                      + ", ".join(raw_path_for(cfg.raw(), t) for t, _, _ in devices))
-            if self.suggester is not None:
-                self._log(f"[assist] {self.provider.name}/{self.provider.model} -> {assist_log.name}")
-            self.emit({"type": "status", "state": "listening", "log": cfg.log_path,
-                       "provider": None if self.provider is None
-                       else f"{self.provider.name}/{self.provider.model}",
-                       "cv_words": self.cv_words, "style": self.cfg.style,
-                   "mode": self.suggester.builder.mode if self.suggester is not None else self.cfg.mode})
-            self._log("[stt] connected - talk / play something. Ctrl+C to stop."
-                      + (f" Auto-stop in {cfg.seconds:g} s." if cfg.seconds else "") + "\n")
-            stopper = asyncio.create_task(self._stop.wait())
-            try:
-                await asyncio.wait([*tasks, stopper], timeout=cfg.seconds or None,
-                                   return_when=asyncio.FIRST_COMPLETED)
-            except (asyncio.CancelledError, KeyboardInterrupt):
-                pass
-            finally:
-                stopper.cancel()
-                for t in tasks:
-                    t.cancel()
-                for s in streams:
-                    s.stop_stream()
-                    s.close()
-                pa.terminate()
-                if self._pending:   # let the last suggestions land before the log closes
-                    await asyncio.wait(self._pending, timeout=SUGGEST_DRAIN_S)
-                if self.provider is not None:
-                    await self._close_providers()
-                log.close()
-                if assist_log is not None:
-                    assist_log.close()
-                for r in raws:
-                    r.close()
-                self._finish()
-                self.emit({"type": "status", "state": "stopped"})
+                self._log(f"[log] utterances -> {cfg.log_path} | raw -> "
+                          + ", ".join(raw_path_for(cfg.raw(), t) for t, _, _ in devices))
+                if self.suggester is not None:
+                    self._log(f"[assist] {self.provider.name}/{self.provider.model} -> {assist_log.name}")
+                self.emit({"type": "status", "state": "listening", "log": cfg.log_path,
+                           "provider": None if self.provider is None
+                           else f"{self.provider.name}/{self.provider.model}",
+                           "cv_words": self.cv_words, "style": self.cfg.style,
+                           "mode": self.suggester.builder.mode if self.suggester is not None else self.cfg.mode})
+                listening = True
+                self._log("[stt] connected - talk / play something. Ctrl+C to stop."
+                          + (f" Auto-stop in {cfg.seconds:g} s." if cfg.seconds else "") + "\n")
+                ended = await self._wait_until_over(streams)
+        finally:
+            if listening:                    # a call that never got as far as listening has no summary
+                if ended:
+                    self._log(f"[stt] {ended}")
+                self._end(ended)
                 self._log("\n[stopped]")

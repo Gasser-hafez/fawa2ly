@@ -212,3 +212,195 @@ def test_seconds_stops_a_replay_as_it_stops_a_live_session(tmp_path):
                on_event=lambda _e: None)
     asyncio.run(asyncio.wait_for(e.run(), timeout=20))
 
+
+
+# ---- the live path's setup, teardown and failures (audit F2, F3) ----
+
+import sys  # noqa: E402
+import types  # noqa: E402
+
+from fawa2ly import engine as engine_module  # noqa: E402
+
+
+class FakeCapture:
+    def __init__(self):
+        self.stopped = self.closed = False
+
+    def stop_stream(self):
+        self.stopped = True
+
+    def close(self):
+        self.closed = True
+
+
+def fake_pyaudio(monkeypatch, fail_open_number=0):
+    """pyaudiowpatch with a loopback speaker and a microphone. The Nth open() raises, like a
+    microphone in exclusive mode; every stream and the PyAudio itself record being let go."""
+    speaker = {"name": "Speakers", "isLoopbackDevice": True, "defaultSampleRate": 48000,
+               "maxInputChannels": 2, "index": 0}
+    mic = {"name": "Mic", "isLoopbackDevice": False, "defaultSampleRate": 44100,
+           "maxInputChannels": 1, "index": 1}
+    made = types.SimpleNamespace(streams=[], terminated=False)
+
+    class PyAudio:
+        def get_host_api_info_by_type(self, _t):
+            return {"defaultOutputDevice": 0}
+
+        def get_device_info_by_index(self, _i):
+            return speaker
+
+        def get_device_info_generator_by_host_api(self, host_api_type=None):
+            yield mic
+
+        def get_default_input_device_info(self):
+            return mic
+
+        def open(self, **_kw):
+            if len(made.streams) + 1 == fail_open_number:
+                raise OSError("exclusive mode")
+            made.streams.append(FakeCapture())
+            return made.streams[-1]
+
+        def terminate(self):
+            made.terminated = True
+
+    module = types.ModuleType("pyaudiowpatch")
+    module.PyAudio, module.paInt16, module.paWASAPI, module.paContinue = PyAudio, 8, 13, 0
+    monkeypatch.setitem(sys.modules, "pyaudiowpatch", module)
+    return made
+
+
+class FakeDeepgram:
+    """Stands in for DeepgramSTT. `die_with` makes events() raise, the way a dropped socket does;
+    `refuse_at` makes the Nth connection fail with HTTP 401."""
+    die_with = None
+    connects = 0
+    refuse_at = 0
+
+    def __init__(self, key, lang, raw_log=None, **_params):
+        FakeDeepgram.connects += 1
+        if FakeDeepgram.connects == FakeDeepgram.refuse_at:
+            raise engine_module.InvalidStatus(types.SimpleNamespace(status_code=401))
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return None
+
+    async def send_audio(self, chunk, t_capture=None):
+        return None
+
+    async def events(self):
+        if FakeDeepgram.die_with is not None:
+            await asyncio.sleep(0.05)
+            raise FakeDeepgram.die_with
+        await asyncio.Event().wait()
+        yield  # pragma: no cover
+
+
+@pytest.fixture
+def live(monkeypatch, tmp_path):
+    """A live Engine's world with no hardware, no key and no network."""
+    monkeypatch.setenv("DEEPGRAM_API_KEY", "test-key")
+    monkeypatch.setattr(engine_module, "DeepgramSTT", FakeDeepgram)
+    FakeDeepgram.die_with, FakeDeepgram.connects, FakeDeepgram.refuse_at = None, 0, 0
+    opened = []
+    real_open = open
+
+    def tracking_open(*a, **kw):
+        f = real_open(*a, **kw)
+        opened.append(f)
+        return f
+
+    monkeypatch.setattr(engine_module, "open", tracking_open, raising=False)
+    return types.SimpleNamespace(opened=opened, log=str(tmp_path / "call.jsonl"))
+
+
+def test_a_setup_that_fails_halfway_lets_go_of_everything_it_opened(monkeypatch, live):
+    """Audit F2: the microphone's open() fails after the speaker's stream, the files and the first
+    connection exist. The first stream must be stopped, PortAudio terminated, every file closed and
+    no task left running - and the failure still reaches the caller, for the server to report."""
+    made = fake_pyaudio(monkeypatch, fail_open_number=2)
+    events = []
+    e = Engine(EngineConfig(log_path=live.log, user_mic=True), on_event=events.append)
+
+    async def go():
+        with pytest.raises(OSError, match="exclusive mode"):
+            await asyncio.wait_for(e.run(), timeout=10)
+        await asyncio.sleep(0.05)
+        return [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+
+    leftover = asyncio.run(go())
+    assert [s.stopped and s.closed for s in made.streams] == [True]
+    assert made.terminated is True
+    assert live.opened and all(f.closed for f in live.opened)
+    assert not leftover
+    assert not [x for x in events if x["type"] == "status" and x.get("state") == "stopped"], \
+        "a call that never listened has no summary and no `stopped` of its own: the server sends it"
+
+
+def test_a_rejected_deepgram_key_is_said_in_words(monkeypatch, live):
+    made = fake_pyaudio(monkeypatch)
+    FakeDeepgram.refuse_at = 1
+    e = Engine(EngineConfig(log_path=live.log), on_event=lambda _e: None)
+    with pytest.raises(RuntimeError, match="check the key under Settings"):
+        asyncio.run(asyncio.wait_for(e.run(), timeout=10))
+    assert made.terminated and all(f.closed for f in live.opened)
+
+
+def test_a_speech_stream_that_dies_mid_call_ends_it_with_the_reason(monkeypatch, live):
+    """Audit F3: the connection drops 20 minutes in. The window used to get a clean `stopped` and say
+    'Call ended'; it must get the reason, after the summary, and everything is still let go."""
+    made = fake_pyaudio(monkeypatch)
+    FakeDeepgram.die_with = ConnectionResetError("received 1011 (internal error) keepalive ping timeout")
+    events = []
+    e = Engine(EngineConfig(log_path=live.log), on_event=events.append)
+    asyncio.run(asyncio.wait_for(e.run(), timeout=10))
+    ends = [x for x in events if x["type"] == "summary" or (x["type"] == "status" and x.get("state") == "stopped")]
+    assert [x["type"] for x in ends] == ["summary", "status"], "the summary, then `stopped`, once"
+    assert "Speech recognition stopped (the call)" in ends[-1]["error"]
+    assert "keepalive ping timeout" in ends[-1]["error"]
+    assert made.streams[0].closed and made.terminated and all(f.closed for f in live.opened)
+
+
+def test_ending_the_call_yourself_is_not_an_error(monkeypatch, live):
+    fake_pyaudio(monkeypatch)
+    events = []
+    e = Engine(EngineConfig(log_path=live.log), on_event=events.append)
+
+    async def go():
+        run = asyncio.create_task(e.run())
+        while not any(x.get("state") == "listening" for x in events if x["type"] == "status"):
+            await asyncio.sleep(0.01)
+        e.stop()
+        await asyncio.wait_for(run, timeout=10)
+
+    asyncio.run(go())
+    stopped = [x for x in events if x["type"] == "status" and x.get("state") == "stopped"]
+    assert len(stopped) == 1 and "error" not in stopped[0]
+
+
+def test_a_replay_whose_model_cannot_be_built_closes_its_log(monkeypatch, live):
+    """The same unwind for a replay: a model with no key raises after the log was opened."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    e = Engine(EngineConfig(log_path=live.log, replay="x.raw.jsonl", suggest=True, vendor="gemini"),
+               on_event=lambda _e: None)
+    with pytest.raises(Exception):
+        asyncio.run(asyncio.wait_for(e.run(), timeout=10))
+    assert live.opened and all(f.closed for f in live.opened)
+
+
+def test_a_suggestion_still_running_when_the_call_closes_is_cancelled_not_left_to_write_to_a_closed_log(monkeypatch):
+    """After the drain's grace period the late task used to be left running, to raise on a closed
+    assist log in a task nobody awaits."""
+    monkeypatch.setattr(engine_module, "SUGGEST_DRAIN_S", 0.05)
+    e, events = engine()
+
+    async def go():
+        late = e._spawn(asyncio.sleep(30))
+        await e._drain()
+        await asyncio.sleep(0)
+        return late
+
+    assert asyncio.run(go()).cancelled()
