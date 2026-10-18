@@ -33,13 +33,26 @@ jobs:
           "VERSION=$v" | Out-File -Append -Encoding ascii $env:GITHUB_ENV
 
       # Updates are signed: the app installs nothing whose signature does not match its public key.
+      # The secrets are tried here, by signing a scratch file, so a key or password pasted wrong fails
+      # in seconds and says why, instead of at the end of a 15-minute build. Errors here and in the
+      # build are also written as annotations, which GitHub shows without signing in (job logs it
+      # does not), so a failed release can be read from the run page or the API.
       - name: Signing key
         shell: pwsh
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
-            throw "Add the TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD secrets: see docs/RELEASING.md"
+            Write-Output "::error title=Signing key::Add the TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD secrets (docs/RELEASING.md)."
+            exit 1
+          }
+          "key check" | Out-File -Encoding ascii key-check.txt
+          $out = (npx --yes @tauri-apps/cli@2.11.4 signer sign key-check.txt 2>&1) -join "`n"
+          if ($LASTEXITCODE) {
+            $why = ($out -split "`n" | Where-Object { $_ -match "rror" } | Select-Object -Last 1).Trim()
+            Write-Output "::error title=Signing key::The signing secrets do not work: $why. Re-add both from %USERPROFILE%\.tauri (docs/RELEASING.md)."
+            exit 1
           }
 
       - uses: actions/setup-python@v5
@@ -67,11 +80,20 @@ jobs:
           workspaces: app/src-tauri
       - run: npm ci
         working-directory: app
-      - run: npx tauri build --config src-tauri/tauri.bundle.json
+
+      - name: Build the installer
+        shell: pwsh
         working-directory: app
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          npx tauri build --config src-tauri/tauri.bundle.json 2>&1 | Tee-Object -FilePath build.log
+          if ($LASTEXITCODE) {
+            $tail = (Get-Content build.log -Tail 30 | Where-Object { $_.Trim() }) -join "%0A"
+            Write-Output "::error title=tauri build failed::$tail"
+            exit 1
+          }
 
       - name: Checksum
         shell: pwsh
