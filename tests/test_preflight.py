@@ -101,3 +101,24 @@ def test_the_server_does_not_start_a_call_that_failed_its_checks(tmp_path, monke
     with pytest.raises(RuntimeError, match="not started"):
         asyncio.run(srv.start_session({}))
     assert built == [] and srv.session is None
+
+
+def test_a_fake_model_or_a_recording_starts_without_the_key_checks(monkeypatch):
+    """Agent 2 R1: `--replay ... --fake-llm` (README's UI loop) was refused by the preflight for want
+    of a Gemini and a Deepgram key, which that run never uses."""
+    from fawa2ly import server as server_mod
+
+    made = []
+
+    class Spy:
+        def __init__(self, *a, **kw):
+            made.append(kw)
+
+        async def run(self):
+            return None
+
+    monkeypatch.setattr(server_mod, "SessionServer", Spy)
+    assert server_mod.main(["--replay", "demo.raw.jsonl", "--suggest", "--fake-llm", "--port", "0"]) == 0
+    assert server_mod.main(["--idle", "--fake-llm", "--port", "0"]) == 0
+    assert server_mod.main(["--idle", "--port", "0"]) == 0
+    assert [kw["preflight"] is None for kw in made] == [True, True, False]

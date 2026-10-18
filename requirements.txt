@@ -3,6 +3,7 @@
 numpy==2.2.6
 scipy==1.15.3
 openai==3.8.0
+httpx==0.28.1               # fawa2ly/preflight.py imports it directly (openai brings it too)
 # Audio capture is Windows-only today (WASAPI loopback); the marker keeps the rest installable
 # elsewhere so the tests and the replay tools run on Linux and macOS.
 pyaudiowpatch==0.2.12.8; sys_platform == "win32"

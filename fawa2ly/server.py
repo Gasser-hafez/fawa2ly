@@ -879,7 +879,10 @@ def main(argv=None) -> int:
 
     try:
         server = SessionServer(make_engine, host=a.host, port=a.port, autostart=None if a.idle else {},
-                               allow_origins=tuple(a.allow_origin), preflight=preflight_call)
+                               allow_origins=tuple(a.allow_origin),
+                               # a fake model and a recording need no key: checking real ones would refuse
+                               # the documented UI-development run (README) and spend a request
+                               preflight=None if (a.fake_llm or a.replay) else preflight_call)
         asyncio.run(server.run())
     except KeyboardInterrupt:
         pass
