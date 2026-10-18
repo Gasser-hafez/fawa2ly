@@ -412,3 +412,23 @@ def test_a_handler_that_fails_costs_one_error_event_not_the_connection(monkeypat
 
     asyncio.run(go())
     assert "OSError" in capsys.readouterr().err, "the traceback goes to stderr, which is engine.log"
+
+
+def test_a_call_that_cannot_start_says_why_in_the_stopped_status():
+    """The contract the overlay now reads (audit F1): `stopped` carries `error`, then idle. The
+    server already sent it; main.js threw it away and showed "This session is finished"."""
+    class NoKey(StubEngine):
+        async def run(self):
+            raise RuntimeError("No Deepgram key: add one in Settings, under API keys, then start again.")
+
+    async def go():
+        server = SessionServer(lambda chosen, emit: NoKey(emit, chosen), host="127.0.0.1", port=0)
+        task = await start(server)
+        async with connect(f"ws://127.0.0.1:{server.port}") as ws:
+            await ws.send(json.dumps({"cmd": "start", "settings": {}}))
+            stopped = await wait_for(ws, lambda e: e.get("state") == "stopped")
+            assert "No Deepgram key" in stopped["error"]
+            await wait_for(ws, lambda e: e.get("state") == "idle")      # and the server is ready again
+        task.cancel()
+
+    asyncio.run(go())

@@ -54,6 +54,7 @@ let view = null;                  // index into history, or null to follow the n
 let unseen = false;               // a newer question arrived while an older one was on screen
 let logPath = "";
 let summary = null;               // the ended call's summary, from the engine (roadmap item 6)
+let stopError = "";               // why the engine ended the call when the user did not: status "stopped" error
 let pace = null;                  // the user's latest pace, from the engine (roadmap item 8)
 let lastIdle = null;              // the setup screen's contents, kept while the call summary is up
 let cvWords = null;               // background the running call has; 0 means none at all
@@ -155,10 +156,15 @@ function transcriptLine(s) {
 function showEnded() {
   el.current.hidden = true;
   el.nav.hidden = true;
-  notice("Call ended.",
-         summary ? summaryLine(summary)
-           : logPath ? `Everything said and suggested is in ${logPath}.` : "This session is finished.",
-         "new-call", summary ? transcriptLine(summary) : "");
+  const detail = summary ? summaryLine(summary)
+    : logPath ? `Everything said and suggested is in ${logPath}.` : "This session is finished.";
+  // When the engine ended the call itself it says why: a missing key, a device that would not open, a
+  // dropped speech connection. That used to be thrown away, and "Call ended / This session is
+  // finished" was all anyone saw of a failed start (audit F1).
+  notice(stopError ? (summary ? "The call stopped." : "The call could not start.") : "Call ended.",
+         stopError || detail,
+         "new-call",
+         summary ? (stopError ? `${detail}. ${transcriptLine(summary)}` : transcriptLine(summary)) : "");
   // a saved call with the user's own words can be reviewed (roadmap item 7)
   el.reviewCall.hidden = !(summary && summary.transcript && summary.has_you);
   renderEarlier();
@@ -492,7 +498,7 @@ function renderSetup(event) {
   } else {
     const o = document.createElement("option");
     o.value = "";
-    o.textContent = "No model has a key yet: add one to .env";
+    o.textContent = "No model has a key yet: add one under API keys";
     el.vendor.replaceChildren(o);
   }
   el.speculate.checked = s.speculate !== false;
@@ -505,6 +511,7 @@ function showSetup(event) {
   lastIdle = event || lastIdle;
   history.length = 0;
   summary = null;
+  stopError = "";
   pace = null;
   view = null;
   unseen = false;
@@ -572,8 +579,10 @@ function onStatus(event) {
   } else if (event.state === "stopped") {
     live = false;
     view = null;
+    stopError = event.error || "";
     setPanel("stopped");
-    el.state.textContent = `Call ended, ${history.length} question${history.length === 1 ? "" : "s"}`;
+    el.state.textContent = stopError ? "Call stopped"
+      : `Call ended, ${history.length} question${history.length === 1 ? "" : "s"}`;
     el.end.hidden = true;
     setCaption("not listening", true);
     showEnded();
