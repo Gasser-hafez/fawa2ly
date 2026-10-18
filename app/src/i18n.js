@@ -109,6 +109,7 @@ every string in both pages has a translation here.
     "Call ended.": "انتهت المكالمة.",
     "Call ended": "انتهت المكالمة",
     "Call stopped": "توقفت المكالمة",
+    "Ending the call": "جارٍ إنهاء المكالمة",
     "The call stopped.": "توقفت المكالمة.",
     "The call could not start.": "تعذّر بدء المكالمة.",
     "This session is finished.": "انتهت هذه الجلسة.",
@@ -424,6 +425,8 @@ every string in both pages has a translation here.
 
   const PATTERNS = [
     [/^Fawa2ly (\S+) is ready$/, (m) => `فوقلي ${m[1]} جاهز`],
+    [/^Fawa2ly (\S+) is ready\. It can be installed when the call ends\.$/, (m) => `فوقلي ${m[1]} جاهز. يمكن تثبيته بعد انتهاء المكالمة.`],
+    [/^Call stopped: (.+)$/, (m) => `توقفت المكالمة: ${m[1]}`],
     [/^Version (\S+)$/, (m) => `الإصدار ${m[1]}`],
     [/^You have (\S+)\. Updating takes a minute and reopens the app\.$/, (m) => `لديك الإصدار ${m[1]}. يستغرق التحديث دقيقة ثم يُعاد فتح التطبيق.`],
     [/^Downloading, (\d+)%$/, (m) => `جارٍ التنزيل، ${m[1]}%`],

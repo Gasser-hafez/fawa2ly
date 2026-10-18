@@ -580,6 +580,7 @@ function onStatus(event) {
     live = false;
     view = null;
     stopError = event.error || "";
+    if (onStopped) onStopped();                    // the window was closed on this call: now it can go
     setPanel("stopped");
     el.state.textContent = stopError ? "Call stopped"
       : `Call ended, ${history.length} question${history.length === 1 ? "" : "s"}`;
@@ -989,7 +990,22 @@ el.cvFile.addEventListener("change", async () => {
     send("cv", { mode: el.mode.value, name: file.name, data: btoa(binary) });
   }
 });
-el.close.addEventListener("click", () => {
+// Closing the window ends the app and its engine, and a call that never reaches its end loses the
+// summary and the transcript the user chose to keep: the engine writes both when the call ends. So a
+// call still running is ended first, for as long as the engine needs: a little over its own wait
+// for the answers still being written (engine.py SUGGEST_DRAIN_S). Audit F4. Alt+F4 and the taskbar's
+// "Close window" do not come through here (see the fix plan, owner decision).
+const CLOSE_WAIT_MS = 12000;
+let onStopped = null;             // set while the window waits for the call it was closed on to end
+
+el.close.addEventListener("click", async () => {
+  if (live && send("stop")) {
+    el.close.disabled = true;
+    el.state.textContent = "Ending the call";
+    await new Promise((resolve) => { onStopped = resolve; setTimeout(resolve, CLOSE_WAIT_MS); });
+    onStopped = null;
+    el.close.disabled = false;
+  }
   // In the Tauri window this closes it; in a browser tab it is a no-op unless the tab was
   // opened by script, which is fine: the browser is only ever used for development.
   const tauri = window.__TAURI__;

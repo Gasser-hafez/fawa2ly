@@ -1199,6 +1199,25 @@ function handle(e) {
     case "settings":
       render(e.settings);
       return;
+    case "status":
+      // Whether a call is running. Without this `live` was never set, so a model picked here never
+      // reached a running call, "Saved" was all this window could say, and an update could be
+      // installed over a call (audit R3, F4). The overlay's own copy of the same states is main.js.
+      if (e.state === "idle") {
+        live = false;
+        $("conn").textContent = "Not in a call";
+        if (e.settings) render(e.settings);
+      } else if (e.state === "listening" || e.state === "paused") {
+        live = true;
+        if (e.provider) activeVendor = e.provider.split("/")[0];
+        $("conn").textContent = `In a call${e.provider ? ` on ${e.provider}` : ""}`;
+        if (Object.keys(current).length) render();   // the vendor picker shows the running model
+      } else if (e.state === "stopped") {
+        live = false;
+        $("conn").textContent = e.error ? `Call stopped: ${e.error}` : "Call ended";
+      }
+      renderUpdate(window.fawa2lyUpdates.state);
+      return;
     case "calls":
       calls = e.calls || [];
       renderCalls();
@@ -1271,7 +1290,9 @@ function renderUpdate(s) {
   $("upd-browser").hidden = on;
   $("upd-check").hidden = !on;
   $("upd-check").disabled = s.phase === "checking" || working;
-  $("upd-install").hidden = !u || working;
+  // Installing closes the app and its engine: never over a call (README: "between calls, never
+  // during one"). The update waits; the state line says when it can go.
+  $("upd-install").hidden = !u || working || live;
   $("upd-version").textContent = s.version || "-";
   $("foot-version").hidden = !s.version;
   if (s.version) $("foot-version").textContent = `Version ${s.version}`;
@@ -1284,7 +1305,8 @@ function renderUpdate(s) {
   $("upd-state").textContent = {
     checking: "Checking for updates",
     latest: "You have the newest version.",
-    ready: u ? `Fawa2ly ${u.version} is ready` : "",
+    ready: u ? (live ? `Fawa2ly ${u.version} is ready. It can be installed when the call ends.`
+                     : `Fawa2ly ${u.version} is ready`) : "",
     downloading: pct === null ? "Downloading the update" : `Downloading the update, ${pct}%`,
     installing: "Installing. Fawa2ly closes and opens again by itself.",
     error: s.failed === "check" ? `Could not check for updates: ${s.error}` : `The update did not install: ${s.error}`,
