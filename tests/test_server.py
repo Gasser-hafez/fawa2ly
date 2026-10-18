@@ -432,3 +432,22 @@ def test_a_call_that_cannot_start_says_why_in_the_stopped_status():
         task.cancel()
 
     asyncio.run(go())
+
+
+def test_a_cli_flag_beats_the_saved_speech_choice_and_the_saved_choice_fills_the_default():
+    """Audit F23: config_from overwrote `--stt-vendor whisper --whisper-model tiny` with the saved
+    values on every call, so the flags did nothing."""
+    from fawa2ly import settings as user_settings
+    from fawa2ly.engine import EngineConfig
+    from fawa2ly.server import config_from
+
+    assert config_from(EngineConfig(), {}).stt_vendor == "deepgram"
+    flags = config_from(EngineConfig(stt_vendor="whisper", whisper_model="tiny"), {})
+    assert (flags.stt_vendor, flags.whisper_model) == ("whisper", "tiny")
+    s = user_settings.load()
+    s.stt_vendor, s.whisper_model = "whisper", "base"
+    user_settings.save(s)
+    saved = config_from(EngineConfig(), {})
+    assert (saved.stt_vendor, saved.whisper_model) == ("whisper", "base")
+    mixed = config_from(EngineConfig(whisper_model="tiny"), {})
+    assert (mixed.stt_vendor, mixed.whisper_model) == ("whisper", "tiny")

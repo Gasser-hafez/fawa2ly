@@ -12,6 +12,7 @@ import asyncio
 import json
 import time
 from typing import AsyncIterator, Optional, TextIO
+from urllib.parse import urlencode
 
 import websockets
 
@@ -34,7 +35,7 @@ DEFAULT_PARAMS = {
 
 def build_url(lang: str, **overrides) -> str:
     params = {**DEFAULT_PARAMS, "language": lang, **overrides}
-    return "wss://api.deepgram.com/v1/listen?" + "&".join(f"{k}={v}" for k, v in params.items())
+    return "wss://api.deepgram.com/v1/listen?" + urlencode(params)   # a value cannot add a parameter
 
 
 def parse_message(d: dict, t_recv: float, t_rel: Optional[float]) -> Optional[STTEvent]:

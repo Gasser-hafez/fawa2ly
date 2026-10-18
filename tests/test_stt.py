@@ -226,3 +226,10 @@ def _write_tmp(text: str) -> str:
     f.write(text)
     f.close()
     return f.name
+
+
+def test_a_language_value_cannot_add_a_deepgram_parameter():
+    """Audit F25: values were joined into the query string as they came."""
+    url = build_url("en&callback=https://evil.example/x")
+    assert "&callback=" not in url and url.count("language=") == 1
+    assert build_url("en-US").count("language=en-US") == 1, "ordinary values are unchanged"

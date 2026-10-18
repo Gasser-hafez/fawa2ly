@@ -125,3 +125,11 @@ def test_an_early_ask_for_part_of_the_turn_is_dropped_and_the_whole_turn_is_aske
     assert len(llm.requests) == 2
     assert [kind for kind, _, _ in seen] == ["question", "line", "assist"]
     assert seen[0][2] == WHOLE and seen[-1][2] == WHOLE
+
+
+def test_an_arabic_question_is_asked_early_like_an_english_one():
+    """Audit F24: pipeline.py kept its own sentence-end string without U+061F, so a question ending
+    in the Arabic question mark never fired the early ask (the detector's copy had it)."""
+    words = [("ايه", 1.0, 1.2), ("خبرتك", 1.2, 1.6), ("في", 1.6, 1.8), ("فلاتر؟", 1.8, 2.3)]
+    early = feed(Pipeline(turns=True, speculate=True), [final(2.4, 2.4, words)])
+    assert [u.text for u in early] == ["ايه خبرتك في فلاتر؟"] and all(u.speculative for u in early)

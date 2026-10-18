@@ -35,9 +35,10 @@ from dataclasses import asdict, dataclass
 from typing import Callable, Optional
 
 from .stt.base import STTEvent, Word
-from .turn.detector import classify, sentences
+# One list of sentence ends for the detector and the pipeline: a copy here lacked the Arabic
+# question mark, so an Arabic question never fired the early ask (audit F24).
+from .turn.detector import _TERMINAL, classify, sentences
 
-_TERMINAL = ".?!"
 _FIRED_TOLERANCE_S = 0.5   # a candidate ending within this of an earlier fire is the same question
 CONTINUATION_WINDOW_S = 4.0   # see Pipeline._is_continuation
 _SAME_START_S = 0.25          # word starts are stable between interims to within ~0.1 s

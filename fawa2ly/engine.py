@@ -497,8 +497,11 @@ class Engine:
             on_interim = lambda text: self.emit({"type": "interim", "text": text})  # noqa: E731
         else:
             events = self._paced(events)
+        # Both sides go to the suggester: the user's own words are history it must see ("you:" lines
+        # in the prompt, the recap), and it never answers them - only the other stream can be a
+        # question (assist.is_question, audit F17).
         return consume(events, self._pipeline_for(tag), log, tag, show=self._log,
-                       suggester=self.suggester if tag == "other" else None, spawn=self._spawn,
+                       suggester=self.suggester, spawn=self._spawn,
                        on_utterance=lambda u: self.emit({"type": "utterance", "utterance": u.to_json()}),
                        on_interim=on_interim)
 

@@ -184,8 +184,14 @@ def config_from(base: EngineConfig, chosen: dict) -> EngineConfig:
         cfg.transcript_dir = user_settings.transcripts_dir()
     cfg.feedback = saved.live_feedback            # roadmap item 9, off unless turned on
     cfg.negotiation = saved.negotiation           # roadmap item 25, off unless turned on
-    cfg.stt_vendor = saved.stt_vendor             # roadmap item 26: deepgram (default) or whisper (offline)
-    cfg.whisper_model = saved.whisper_model
+    # roadmap item 26: deepgram (default) or whisper (offline). Precedence is CLI flag > saved
+    # setting > default: a flag left at its default cannot be told from one not given, so the saved
+    # setting fills in only while the flag is at the default (it used to overwrite the flag, and
+    # `--stt-vendor whisper` silently did nothing, audit F23).
+    if base.stt_vendor == EngineConfig.stt_vendor:
+        cfg.stt_vendor = saved.stt_vendor
+    if base.whisper_model is None:
+        cfg.whisper_model = saved.whisper_model
     return cfg
 
 

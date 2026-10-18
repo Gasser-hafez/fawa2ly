@@ -404,3 +404,20 @@ def test_a_suggestion_still_running_when_the_call_closes_is_cancelled_not_left_t
         return late
 
     assert asyncio.run(go()).cancelled()
+
+
+def test_your_own_words_reach_the_suggesters_history_but_are_never_asked():
+    """Audit F17: `_consumer` handed the suggester only the other side's stream, so the `you:` lines
+    the prompt and the recap rely on never existed. This goes through the wiring, not `handle`."""
+    e, events = engine()
+    e.suggester = Suggester(FakeLLM(bullets=["never used"]), ContextBuilder())
+    stream = FakeStream([ev("final", 103.0, 14.0, QUESTION), STTEvent("utterance_end", 104.0, 15.0)])
+
+    async def go():
+        await e._consumer(stream, "user", io.StringIO())
+        if e._pending:
+            await asyncio.wait(e._pending, timeout=2)
+
+    asyncio.run(go())
+    assert [who for who, _ in e.suggester.history] == ["you"]
+    assert not [x for x in events if x["type"] == "question"]
