@@ -12,7 +12,7 @@ You should get an answer within a week.
   settings window. It refuses to bind to any other address.
 - **Web pages cannot talk to it.** A browser lets any page open a WebSocket to localhost, so the
   engine checks the `Origin` of every connection and accepts only the app's own windows (the Tauri
-  webview and the local dev server) plus connections that send no `Origin` at all, which a browser
+  webview, and the local dev server on port 5173 when the engine runs from source) plus connections that send no `Origin` at all, which a browser
   page cannot do. It also checks that the `Host` header is a loopback name, which stops DNS
   rebinding. Extra origins must be named explicitly (`--allow-origin`). Tests:
   `tests/test_server_security.py`.

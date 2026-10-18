@@ -53,7 +53,15 @@ both made before the handshake completes:
 
 Binding to any other interface is refused outright, since there is still no authentication.
 The `cv` command writes a file the user chose, into the app folder, which is safe for the same
-reasons.
+reasons. The installed engine (a frozen build) accepts only the app's own origins: the :5173 dev
+pages are for running from source, and a page served on that port on a user's machine is not ours.
+
+**One bad message never costs the connection.** Whatever is wrong with a command - not JSON, not an
+object, a field of the wrong type, a handler that raises (a locked settings.json, a full disk) - the
+sender is answered with an `error` event and the socket stays up. An escaping exception used to
+close it with 1011, and the overlay then said "not listening" in the middle of a call. A document
+up to `MAX_UPLOAD_BYTES` fits one frame; the default 1 MiB frame closed the socket on an ordinary
+PDF CV with no message at all.
 """
 
 from __future__ import annotations
@@ -65,6 +73,7 @@ import json
 import os
 import sys
 import time
+import traceback
 from http import HTTPStatus
 from typing import Callable, Optional
 
@@ -78,6 +87,7 @@ from .context import available, available_modes, extract_cv
 from .context.builder import preset_info
 from .dictation import Dictation
 from .engine import Engine, EngineConfig, list_devices
+from .limits import MAX_UPLOAD_BYTES
 
 try:
     from dotenv import load_dotenv
@@ -95,11 +105,31 @@ LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
 # The pages that may talk to the engine: the Tauri webview (http://tauri.localhost on Windows and
 # Android, tauri:// on macOS and Linux, https:// when the app is configured for it) and the plain
 # static server the README uses for UI work. Add more with --allow-origin, one flag per origin.
-ALLOWED_ORIGINS = (
-    "http://tauri.localhost", "https://tauri.localhost", "tauri://localhost",
-    "http://127.0.0.1:5173", "http://localhost:5173",
-)
+APP_ORIGINS = ("http://tauri.localhost", "https://tauri.localhost", "tauri://localhost")
+DEV_ORIGINS = ("http://127.0.0.1:5173", "http://localhost:5173")
+ALLOWED_ORIGINS = APP_ORIGINS + DEV_ORIGINS
 HISTORY = 200        # events replayed to a client that connects (or reconnects) mid-session
+
+
+def default_origins() -> tuple:
+    """The dev server's origins only when running from source: the installed engine (PyInstaller
+    sets sys.frozen) serves the app's own windows, and --allow-origin still adds any other."""
+    return APP_ORIGINS if getattr(sys, "frozen", False) else ALLOWED_ORIGINS
+
+
+def _object(value, what: str) -> dict:
+    """A field that has to be a JSON object (absent counts as empty). ValueError otherwise, which
+    handle_command answers as an `error` event."""
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError(f"{what} must be an object")
+    return value
+
+
+def _read_document(name: str, data: str) -> str:
+    """The text of an uploaded file (base64 in `data`). Plain function so it runs in a thread."""
+    return extract_cv(name, base64.b64decode(data))
 
 
 def available_providers() -> list[dict]:
@@ -169,7 +199,7 @@ class SessionServer:
         if host not in LOOPBACK_HOSTS:
             raise ValueError(f"refusing to listen on {host}: the engine has no authentication, "
                              "so it only serves this machine (127.0.0.1)")
-        self.origins = tuple(ALLOWED_ORIGINS) + tuple(allow_origins)
+        self.origins = default_origins() + tuple(allow_origins)
         self.host = host
         self.port = port
         self.history_size = history
@@ -470,18 +500,35 @@ class SessionServer:
 
     # ---- inbound ----
     async def handle_command(self, ws, raw: str) -> None:
+        """One message from a window: check its shape, run it, and whatever goes wrong answer the
+        sender with an `error` event instead of letting the exception close the connection."""
         try:
             msg = json.loads(raw)
-        except json.JSONDecodeError:
+        except ValueError:                           # bad JSON, or bytes that are not UTF-8
             await ws.send(json.dumps({"type": "error", "text": "not JSON"}))
             return
+        if not isinstance(msg, dict):
+            await ws.send(json.dumps({"type": "error", "text": 'a command is a JSON object, like {"cmd": "ping"}'}))
+            return
+        try:
+            await self._dispatch(ws, msg)
+        except websockets.ConnectionClosed:
+            raise                                    # the sender left; nobody to tell
+        except ValueError as e:                      # bad input: the message is meant for the user
+            await ws.send(json.dumps({"type": "error", "text": str(e)}, ensure_ascii=False))
+        except Exception as e:                       # a bug or a full disk: engine.log gets the traceback
+            traceback.print_exc()
+            await ws.send(json.dumps({"type": "error", "text": f"{msg.get('cmd')}: {type(e).__name__}: {e}"},
+                                     ensure_ascii=False))
+
+    async def _dispatch(self, ws, msg: dict) -> None:
         cmd = msg.get("cmd")
         if cmd == "start":
             if self.running:
                 await ws.send(json.dumps({"type": "error", "text": "a session is already running"}))
                 return
             try:
-                await self.start_session(msg.get("settings") or {})
+                await self.start_session(_object(msg.get("settings"), "start.settings"))
             except Exception as e:                # a missing preset, say: report it and stay idle
                 await ws.send(json.dumps({"type": "error", "text": str(e)}))
                 self.idle()
@@ -516,7 +563,7 @@ class SessionServer:
             except (TypeError, ValueError):
                 await ws.send(json.dumps({"type": "error", "text": "action needs a question number"}))
         elif cmd == "settings":
-            await self.handle_settings(ws, msg.get("values") or {})
+            await self.handle_settings(ws, _object(msg.get("values"), "settings.values"))
         elif cmd == "cv":
             await self.handle_cv(ws, msg)
         elif cmd == "keys":
@@ -641,8 +688,17 @@ class SessionServer:
             user_settings.remove_document(mode, msg.get("remove") or None)
             self._documents_changed(mode)
             return
+        data = msg.get("data") or ""
+        if not isinstance(name, str) or not isinstance(data, str):
+            raise ValueError("cv needs a file name and base64 data")
+        if len(data) * 3 // 4 > MAX_UPLOAD_BYTES:
+            await ws.send(json.dumps({"type": "error", "text": f"{name} is larger than "
+                                      f"{MAX_UPLOAD_BYTES // 2**20} MB: use a smaller file"}, ensure_ascii=False))
+            return
         try:
-            text = extract_cv(name, base64.b64decode(msg.get("data") or ""))
+            # A worker thread: reading a PDF or DOCX takes seconds, and the loop that carries the
+            # call's audio and captions must not wait for it.
+            text = await asyncio.to_thread(_read_document, name, data)
         except Exception as e:
             await ws.send(json.dumps({"type": "error", "text": f"could not read {name}: {e}"}))
             return
@@ -693,8 +749,11 @@ class SessionServer:
         fanout = asyncio.create_task(self._fanout())
         # origins: None allows a client that sends no Origin (not a browser), anything else must
         # be listed. websockets answers a listed-origin mismatch with 403 before the handler runs.
+        # max_size: a document goes over as one base64 message (4/3 of the file), so a frame has to
+        # hold the largest upload the app accepts; websockets' default of 1 MiB closed the socket on
+        # an ordinary PDF CV.
         async with serve(self.handler, self.host, self.port, origins=[None, *self.origins],
-                         process_request=self._check_host) as server:
+                         process_request=self._check_host, max_size=2 * MAX_UPLOAD_BYTES) as server:
             self.port = server.sockets[0].getsockname()[1]     # resolves port 0 for tests
             print(f"[server] ws://{self.host}:{self.port}  (protocol {PROTOCOL})", flush=True)
             self.idle()

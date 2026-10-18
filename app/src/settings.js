@@ -11,6 +11,7 @@ writes it up), a speed test under Model, and Usage.
 
 const WS_URL = `ws://127.0.0.1:${new URLSearchParams(location.search).get("port") || 8765}`;
 const $ = (id) => document.getElementById(id);
+const MAX_UPLOAD_BYTES = 10 * 2 ** 20;   // fawa2ly/limits.py MAX_UPLOAD_BYTES: a larger file is refused here
 
 let socket = null;
 let providers = [];
@@ -1165,6 +1166,10 @@ $("cv-file").addEventListener("change", async () => {
   const files = [...($("cv-file").files || [])];
   $("cv-file").value = "";
   for (const file of files) {
+    if (file.size > MAX_UPLOAD_BYTES) {           // past the socket's frame limit: say so, do not send
+      flash(`${file.name} is larger than ${MAX_UPLOAD_BYTES / 2 ** 20} MB: use a smaller file`);
+      continue;
+    }
     const bytes = new Uint8Array(await file.arrayBuffer());
     let binary = "";
     for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));

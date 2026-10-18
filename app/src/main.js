@@ -28,6 +28,7 @@ browser pointed at it, which is how it is tested without compiling anything.
 
 const WS_URL = `ws://127.0.0.1:${new URLSearchParams(location.search).get("port") || 8765}`;
 const RECONNECT_MS = 1000;
+const MAX_UPLOAD_BYTES = 10 * 2 ** 20;   // fawa2ly/limits.py MAX_UPLOAD_BYTES: a larger file is refused here
 
 const el = {};
 for (const id of ["panel", "dot", "state", "provider", "providerPick", "pause", "close", "notice",
@@ -968,6 +969,11 @@ el.cvFile.addEventListener("change", async () => {
   const files = [...(el.cvFile.files || [])];
   el.cvFile.value = "";
   for (const file of files) {
+    if (file.size > MAX_UPLOAD_BYTES) {           // past the socket's frame limit: say so, do not send
+      el.setupError.textContent = `${file.name} is larger than ${MAX_UPLOAD_BYTES / 2 ** 20} MB: use a smaller file`;
+      el.setupError.hidden = false;
+      continue;
+    }
     const bytes = new Uint8Array(await file.arrayBuffer());
     let binary = "";
     for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));

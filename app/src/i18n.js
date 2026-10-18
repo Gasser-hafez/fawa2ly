@@ -450,6 +450,7 @@ every string in both pages has a translation here.
     [/^Added "(.+)" and chose it for (interviews|meetings)\.$/,
      (m) => `أُضيف "${m[1]}" واختير ${{ meetings: "للاجتماعات" }[m[2]] || "لمقابلات العمل"}.`],
     [/^Reading (.+)$/, (m) => `جارٍ قراءة ${m[1]}`],
+    [/^(.+) is larger than (\d+) MB: use a smaller file$/, (m) => `حجم ${m[1]} أكبر من ${m[2]} ميغابايت: استخدم ملفًا أصغر`],
     [/^(.+) \(not connected\)$/, (m) => `${m[1]} (غير متصل)`],
     [/^Deepgram, to listen: (set|not set)$/, (m) => `Deepgram، للاستماع: ${m[1] === "set" ? "محفوظ" : "غير محفوظ"}`],
     [/^(.+) model: (set|not set)$/, (m) => `نموذج ${m[1]}: ${m[2] === "set" ? "محفوظ" : "غير محفوظ"}`],

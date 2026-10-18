@@ -43,7 +43,9 @@ Use `?port=9000` in the URL if the engine is not on the default 8765.
 
 The engine only accepts pages from the app's own origins (the Tauri window and `http://127.0.0.1:5173` /
 `http://localhost:5173`, the port above). Serving the UI from another port needs
-`python -m fawa2ly.server --idle --allow-origin http://localhost:8080`.
+`python -m fawa2ly.server --idle --allow-origin http://localhost:8080`. The two `:5173` origins are
+accepted only when the engine runs from source; the installed engine accepts the Tauri window alone
+(and whatever `--allow-origin` names).
 
 ## Permissions
 

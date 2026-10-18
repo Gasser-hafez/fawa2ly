@@ -45,6 +45,11 @@ DIRECTION_WORDS = 10
 # measured with a full budget.
 MAX_DOCUMENT_WORDS = 6000
 
+# The largest file a window may hand over to be read (a CV, an agenda). The socket's frame limit is
+# derived from it (server.py), so the limit that gives the user a message is reached first; the
+# windows check it too before sending (main.js and settings.js MAX_UPLOAD_BYTES: keep the three equal).
+MAX_UPLOAD_BYTES = 10 * 2**20
+
 # The Dynamic answer profile (roadmap item 27, 2026-09-13). The model picks the shape that fits each
 # question - full, keywords or direction - instead of the user choosing one for the whole call, and
 # says which on the FIRST line: STYLE_MARK and the name, nothing else. First, not last and that is forced by the streaming path: each line is passed through the guardrail

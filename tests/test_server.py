@@ -345,3 +345,70 @@ def test_a_call_writes_no_log_unless_transcript_saving_is_on(tmp_path, monkeypat
 
     assert server_mod.engine_factory(EngineConfig(log_path="x.jsonl"), None)({}, lambda e: None) \
         and seen[-1].log_path == "x.jsonl", "without --sessions a command-line run logs where it was told"
+
+
+# ---- the transport: frame size, and one bad message never costs the connection (audit F14, F22) ----
+
+def test_a_document_over_the_old_one_mebibyte_frame_is_read_not_dropped():
+    """800 KB of PDF is 1.07 MB of base64, which websockets' default max_size closed with 1009 and
+    no message. Any file the app accepts has to arrive; a file past MAX_UPLOAD_BYTES is told so."""
+    from fawa2ly import server as server_mod
+
+    async def go():
+        server = make_server()
+        task = await start(server)
+        async with connect(f"ws://127.0.0.1:{server.port}") as ws:
+            big = base64.b64encode(b"%PDF-1.4 " + b"x" * 800_000).decode()
+            await ws.send(json.dumps({"cmd": "cv", "name": "brochure.pdf", "data": big}))
+            err = await wait_for(ws, lambda e: e["type"] == "error")
+            assert "brochure.pdf" in err["text"], "answered by the reader, the socket was not closed"
+            too_big = "A" * (server_mod.MAX_UPLOAD_BYTES * 4 // 3 + 100)
+            await ws.send(json.dumps({"cmd": "cv", "name": "huge.pdf", "data": too_big}))
+            err = await wait_for(ws, lambda e: e["type"] == "error" and "huge.pdf" in e["text"])
+            assert "larger than" in err["text"]
+            await ws.send(json.dumps({"cmd": "ping"}))
+            await wait_for(ws, lambda e: e["type"] == "pong")
+        task.cancel()
+
+    asyncio.run(go())
+
+
+@pytest.mark.parametrize("bad", ['[1, 2]', '"x"', '7', 'null', '{"cmd": "settings", "values": [1]}',
+                                 '{"cmd": "start", "settings": [1]}', '{"cmd": "cv", "name": ["a"]}',
+                                 b"\xff\xfe\x00"])
+def test_a_malformed_command_is_answered_and_the_connection_stays_open(bad):
+    async def go():
+        server = make_server()
+        task = await start(server)
+        async with connect(f"ws://127.0.0.1:{server.port}") as ws:
+            await ws.send(bad)
+            await wait_for(ws, lambda e: e["type"] == "error")
+            await ws.send(json.dumps({"cmd": "ping"}))
+            await wait_for(ws, lambda e: e["type"] == "pong")      # still there
+        task.cancel()
+
+    asyncio.run(go())
+
+
+def test_a_handler_that_fails_costs_one_error_event_not_the_connection(monkeypatch, capsys):
+    """A full disk, a locked settings.json: the window is told, engine.log gets the traceback."""
+    from fawa2ly import settings as user_settings
+
+    def boom(_s):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(user_settings, "save", boom)
+
+    async def go():
+        server = make_server()
+        task = await start(server)
+        async with connect(f"ws://127.0.0.1:{server.port}") as ws:
+            await ws.send(json.dumps({"cmd": "settings", "values": {"theme": "light"}}))
+            err = await wait_for(ws, lambda e: e["type"] == "error")
+            assert "settings" in err["text"] and "No space left" in err["text"]
+            await ws.send(json.dumps({"cmd": "ping"}))
+            await wait_for(ws, lambda e: e["type"] == "pong")
+        task.cancel()
+
+    asyncio.run(go())
+    assert "OSError" in capsys.readouterr().err, "the traceback goes to stderr, which is engine.log"
