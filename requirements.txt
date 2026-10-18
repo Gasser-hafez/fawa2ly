@@ -24,3 +24,7 @@ huggingface-hub==1.31.0
 
 # Only to build the packaged engine for the installer.
 pyinstaller==6.6.0
+
+# The tests (python -m pytest -q). CI installs only this file, so without it every run failed
+# with "No module named pytest" before a single test ran.
+pytest==9.1.1
