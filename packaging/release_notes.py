@@ -21,5 +21,7 @@ def notes(version: str, text: str) -> str:
 
 
 if __name__ == "__main__":
+    # The notes may hold Arabic; a Windows runner's console code page (cp1252) cannot print it.
+    sys.stdout.reconfigure(encoding="utf-8")
     with open(CHANGELOG, encoding="utf-8") as f:
         print(notes(sys.argv[1], f.read()))

@@ -114,6 +114,7 @@ jobs:
           $setup = Get-Item $env:SETUP
           $sig = "$($setup.FullName).sig"
           if (-not (Test-Path $sig)) { throw "no update signature was produced next to $($setup.Name)" }
+          [Console]::OutputEncoding = [Text.Encoding]::UTF8   # read the script's UTF-8 output as UTF-8
           python packaging/release_notes.py $env:VERSION | Out-File -Encoding utf8 notes.md
           $latest = [ordered]@{
             version   = $env:VERSION

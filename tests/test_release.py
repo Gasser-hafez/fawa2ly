@@ -59,3 +59,11 @@ def test_the_workflows_leave_no_git_token_behind_and_ci_only_reads():
                 if str(step.get("uses", "")).startswith("actions/checkout"):
                     assert step.get("with", {}).get("persist-credentials") is False
     assert ci["permissions"] == {"contents": "read"}
+
+
+def test_notes_print_arabic_on_a_windows_console_code_page():
+    import subprocess
+    script = os.path.join(os.path.dirname(__file__), os.pardir, "packaging", "release_notes.py")
+    env = dict(os.environ, PYTHONIOENCODING="cp1252")
+    out = subprocess.run([sys.executable, script, app_version()], env=env, capture_output=True)
+    assert out.returncode == 0, out.stderr.decode(errors="replace")
