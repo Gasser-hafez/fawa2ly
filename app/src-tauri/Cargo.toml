@@ -1,6 +1,6 @@
 [package]
 name = "fawa2ly"
-version = "0.1.0"
+version = "0.1.1"
 description = "Fawa2ly overlay"
 authors = ["Fawa2ly contributors"]
 edition = "2021"

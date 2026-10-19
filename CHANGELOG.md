@@ -3,6 +3,23 @@
 Each section is the release notes for that version: the release workflow puts it on the GitHub
 release, and the app shows it next to **Update and restart**.
 
+## 0.1.1
+
+Fixes from a full review of the app. Nothing you set up needs to change.
+
+- When a call cannot start or stops on its own, the window now says why (a missing or rejected
+  key, a dropped speech connection) instead of only "Call ended".
+- A call that fails to start no longer leaves the microphone open.
+- Closing the window during a call ends the call first, so its summary and transcript are saved.
+  The update button is hidden while a call is running.
+- Fawa2ly checks the model and Deepgram before a call starts, and the engine now closes with the app.
+- Settings are saved safely, so a crash or power cut while saving no longer resets them.
+- "Delete saved transcripts" now also deletes the call logs.
+- Questions ending with the Arabic question mark (؟) are caught.
+- Larger documents (up to 10 MB) can be added; a bad request no longer drops the connection.
+- Settings opens faster, and choosing to speak your role stays on this computer when listening is local.
+- The privacy notes in the README and terms now list every connection the app makes.
+
 ## 0.1.0 (first release)
 
 The first public build of Fawa2ly.
