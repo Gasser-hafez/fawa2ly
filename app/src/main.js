@@ -40,6 +40,7 @@ for (const id of ["panel", "dot", "state", "provider", "providerPick", "pause", 
                   "cvWarning", "style", "more", "openSettings", "hide", "clickThrough", "mode",
                   "cvLabel", "docs", "pace", "feedback", "feedbackVerdict", "feedbackNote", "askedLabel",
                   "callActions", "actSay", "actRecap", "actAsk", "shorter",
+                  "searchWeb", "web", "webState", "webQuery", "webSources",
                   "styleBadge"]) {
   el[id] = document.getElementById(id.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()));
 }
@@ -47,6 +48,7 @@ for (const id of ["panel", "dot", "state", "provider", "providerPick", "pause", 
 let socket = null;
 let live = false;                 // the engine is running: listening or paused
 let paused = false;
+let webSearch = false;            // this call can search the web (roadmap item 10), from its status
 let providers = [];               // [{vendor, model, local}] this machine can use
 let activeProvider = "";          // "vendor/model", as the engine reports it
 const history = [];               // every question of this call, oldest first
@@ -373,9 +375,12 @@ function renderQuestion() {
       : "Keep talking, earlier answers are still below.";
     el.retry.hidden = !live;
   }
-  const answered = live && item.done && item.phase === "lines" && !item.moreLoading;
+  const answered = live && item.done && item.phase === "lines" && !item.moreLoading && !item.searchBusy;
   el.more.hidden = !answered;
   el.shorter.hidden = !answered;
+  // web search (roadmap item 10): once per question, only on a call that has it
+  el.searchWeb.hidden = !(answered && webSearch && !item.search);
+  renderSearch(item);
   el.nav.hidden = history.length < 2 && !ended;
   el.pos.textContent = `${i + 1} / ${history.length}`;
   el.prev.disabled = i <= 0;
@@ -535,6 +540,7 @@ function onStatus(event) {
   if (event.providers) providers = event.providers;
   if (event.settings) applyPrefs(event.settings);
   if (event.cv_words !== undefined) cvWords = event.cv_words;
+  if (event.web_search !== undefined) webSearch = Boolean(event.web_search);
   if (event.mode) callMode = event.mode;   // the label follows it, per card, in renderQuestion
   if (event.style) {
     callStyle = event.style;                                    // direction lines show as arrows
@@ -624,7 +630,37 @@ function onQuestion(event) {
   item.typed = 0;
   item.revealing = false;         // a re-asked question does not wait on the old answer's reveal
   item.moreLoading = false;
+  item.search = null;             // asked again: the new answer may be searched on its own
+  item.searchBusy = false;
   renderQuestion();
+}
+
+// Web search (roadmap item 10): the engine says "searching" (with an empty query while the model
+// writes one), then "found" with the sources while the added lines stream in, or "failed" with why.
+// The finished lines arrive as an assist marked web.
+function onSearch(event) {
+  const item = history.find((q) => q.n === event.n);
+  if (!item) return;
+  const before = item.search || {};
+  item.search = { state: event.state, query: event.query || before.query || "",
+                  sources: event.sources || before.sources || [], error: event.error || "", added: null };
+  item.searchBusy = event.state === "searching" || event.state === "found";
+  if (event.state === "found") item.done = false;     // "writing the next line" while they stream in
+  renderQuestion();
+}
+
+function renderSearch(item) {
+  const s = item.search;
+  el.web.hidden = !s;
+  if (!s) return;
+  el.web.dataset.state = s.state === "found" && s.added !== null ? "done" : s.state;
+  el.webState.textContent = s.state === "failed" ? "Search failed"
+    : s.state === "searching" ? (s.query ? "Searching the web for" : "Writing a search")
+    : s.added === null ? "Found for" : s.added ? "From the web, for" : "Nothing new found for";
+  el.webQuery.textContent = s.state === "failed" ? (s.query ? `${s.query}: ${s.error}` : s.error) : s.query;
+  const sites = [...new Set(s.sources.map((x) => x.site).filter(Boolean))];
+  el.webSources.textContent = sites.join(" · ");
+  el.webSources.title = s.sources.map((x) => x.title).filter(Boolean).join("\n");
 }
 
 function onLine(event) {
@@ -640,6 +676,12 @@ function onAssist(a) {
     // lines from the More button have already streamed onto the card, which keeps its answer
     item.done = true;
     item.moreLoading = false;
+    if (a.web && item.search) {
+      // a web search's lines (roadmap item 10): done, and say whether it found anything to add
+      item.searchBusy = false;
+      if (a.error) Object.assign(item.search, { state: "failed", error: a.error });
+      else item.search.added = a.bullets.length;
+    }
     renderQuestion();
     return;
   }
@@ -684,6 +726,7 @@ function handle(event) {
     case "summary":  summary = event.summary; return;   // sent just before "stopped"
     case "pace":     pace = event; renderPace(); return;
     case "feedback": return onFeedback(event);
+    case "search":   return onSearch(event);
     case "interim":  return setCaption(event.text, false);
     case "notice":   // the checks before a call: the model and the listening service (2026-10-16)
       if (el.start.disabled) el.start.textContent = event.text;
@@ -745,6 +788,14 @@ el.actAsk.addEventListener("click", () => send("action", { kind: "ask" }));
 el.shorter.addEventListener("click", () => {
   const item = shown();
   if (item) send("action", { kind: "shorter", n: item.n });
+});
+el.searchWeb.addEventListener("click", () => {
+  const item = shown();
+  if (item && send("search", { n: item.n })) {
+    item.search = { state: "searching", query: "", sources: [], error: "", added: null };
+    item.searchBusy = true;
+    renderQuestion();
+  }
 });
 // Minimize, not hide (QA 2026-10-17): a hidden window has no taskbar button, so a user who forgot
 // the show/hide hotkey - or had changed it - could not get the overlay back. Minimized, it is one

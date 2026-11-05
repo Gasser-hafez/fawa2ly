@@ -22,6 +22,10 @@ from .prompts import user_content
 # inference-docs.cerebras.ai lists qwen-3.8-27b and gpt-oss-120b on the free tier; only n=1,
 # no tool_stream). Override the model with <VENDOR>_MODEL in .env or --model.
 VENDORS = {
+    # The Codex CLI on this computer, signed in with the user's ChatGPT plan: no key and no address.
+    # Not OpenAI-compatible at all (llm/codex.py); from_env hands it out so every caller gets it.
+    # First, so a fresh install with Codex signed in picks it up before any provider needing a key.
+    "codex": {"base_url": "", "key_env": None, "model": "gpt-5.6-luna", "codex": True},
     "cerebras": {"base_url": "https://api.cerebras.ai/v1", "key_env": "CEREBRAS_API_KEY", "model": "qwen-3.8-27b"},
     # ai.google.dev/gemini-api/docs/openai (verified 2026-09-08): compatibility layer is beta.
     # Gemini 3 models always think; "none" is 2.5-only and gemini-3.8-flash rejects "minimal"
@@ -63,7 +67,7 @@ VENDORS = {
     "jan": {"base_url": "http://localhost:1337/v1", "key_env": None, "model": None, "local": True},
 }
 
-LABELS = {"cerebras": "Cerebras", "gemini": "Google Gemini", "groq": "Groq", "openai": "OpenAI",
+LABELS = {"codex": "Codex (ChatGPT sign-in)", "cerebras": "Cerebras", "gemini": "Google Gemini", "groq": "Groq", "openai": "OpenAI",
           "anthropic": "Anthropic Claude", "openrouter": "OpenRouter", "mistral": "Mistral",
           "deepseek": "DeepSeek", "xai": "xAI Grok", "together": "Together AI", "fireworks": "Fireworks AI",
           "ollama": "Ollama", "lmstudio": "LM Studio", "llamacpp": "llama.cpp server", "vllm": "vLLM",
@@ -144,6 +148,9 @@ class OpenAICompatibleLLM(SuggestionProvider):
         if vendor not in vendors:
             raise ValueError(f"unknown vendor {vendor!r}; known: {', '.join(vendors)}")
         v = vendors[vendor]
+        if v.get("codex"):
+            from .codex import CodexLLM
+            return CodexLLM(model or v["model"])
         key = os.environ.get(v["key_env"]) if v["key_env"] else None
         if v["key_env"] and not key and not v.get("key_optional"):
             raise RuntimeError(f"{v['key_env']} is not set (add it under Settings > API keys)")

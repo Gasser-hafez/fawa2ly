@@ -56,9 +56,12 @@ def env_path() -> str:
 
 
 def key_names() -> tuple[str, ...]:
-    """Deepgram, then each model provider's key, as the provider table names them."""
+    """Deepgram, then each model provider's key, as the provider table names them, then web search's
+    (roadmap item 10)."""
     from .llm.openai_compat import all_vendors
-    names = ["DEEPGRAM_API_KEY"] + [v["key_env"] for v in all_vendors().values() if v.get("key_env")]
+    from .search.tavily import KEY_ENV as SEARCH_KEY
+    names = (["DEEPGRAM_API_KEY"] + [v["key_env"] for v in all_vendors().values() if v.get("key_env")]
+             + [SEARCH_KEY])
     return tuple(dict.fromkeys(names))
 
 
@@ -151,7 +154,11 @@ def remove_custom_provider(pid: str) -> None:
 
 
 def provider_ready(v: dict) -> bool:
-    """On, has a model, and has a key unless it needs none."""
+    """On, has a model, and has a key unless it needs none. Codex: installed and signed in here."""
+    if v.get("codex"):
+        from .llm.codex import codex_ready
+        if not codex_ready():
+            return False
     key_env = v.get("key_env")
     has_key = not key_env or v.get("key_optional") or bool(os.environ.get(key_env))
     return bool(v.get("enabled") and v.get("model") and has_key)
@@ -173,6 +180,7 @@ def provider_catalog() -> list[dict]:
             "key_set": bool(key_env and os.environ.get(key_env)),
             "key_optional": bool(v.get("key_optional")) or not key_env,
             "ready": provider_ready(v),
+            "codex": bool(v.get("codex")),   # signed in through the Codex app: no key, address or temperature
         })
     return out
 
@@ -217,7 +225,8 @@ def save_keys(values) -> list[str]:
 # write a field the engine does not know how to read.
 EDITABLE = ("preset", "lang", "vendor", "model", "stt_vendor", "whisper_model", "user_mic", "speculate",
             "style", "animate", "text_size", "opacity", "hotkeys", "theme", "mode", "speaker_device",
-            "mic_device", "ui_lang", "save_transcripts", "pace_meter", "live_feedback", "negotiation")
+            "mic_device", "ui_lang", "save_transcripts", "pace_meter", "live_feedback", "negotiation",
+            "web_search", "hotkey_only")
 
 
 WHISPER_MODELS = ("tiny", "base", "small", "medium")
@@ -300,7 +309,10 @@ DEFAULT_HOTKEYS = {
     # for the case they exist for: the user is mid-call, looking at the other person or at a shared
     # screen, and reaching for the mouse is the thing they cannot do. Ctrl+Alt like the rest, and
     # each letter is the action's own (R was already retry's, so a recap is C).
-    "say": "Ctrl+Alt+S",
+    # Ctrl+1 since 2026-11-05 (maintainer's choice): with "answer only when asked" on it is the one key
+    # a call needs, so it gets the shortest. It takes Ctrl+1 from browsers' tab switching while the
+    # overlay runs; it can be changed like the rest.
+    "say": "Ctrl+1",
     "recap": "Ctrl+Alt+C",
     "ask": "Ctrl+Alt+Q",
     "shorter": "Ctrl+Alt+H",
@@ -396,6 +408,8 @@ class Settings:
     pace_meter: bool = True          # roadmap item 8: show the speaking pace meter during a call
     live_feedback: bool = False      # roadmap item 9: a verdict on each answer; off unless turned on (it costs requests)
     negotiation: bool = False        # roadmap item 25: a pay or price talk; off unless turned on
+    web_search: bool = False         # roadmap item 10: search the web during a call; off unless turned on (Tavily key or Codex)
+    hotkey_only: bool = False        # answer only when asked ("say" hotkey, Ctrl+1); questions heard are not answered
     mode: str = "interview"          # the call: interview | meeting (picks the prompt and the roles)
     speaker_device: str = ""         # the call's audio: a loopback device by name; "" = Windows default
     mic_device: str = ""             # the user's microphone by name; "" = Windows default
@@ -409,6 +423,8 @@ class Settings:
         d["provider_catalog"] = provider_catalog()
         from .stt import whisper_available
         d["whisper_available"] = whisper_available()   # roadmap item 26: offline STT installed?
+        from .llm.codex import codex_ready
+        d["codex"] = codex_ready()       # Codex signed in here: a model and web search with no key
         d["documents"] = {m: list_documents(m) for m in MODES}
         # the words the next call of the saved kind would have, for the "no document" warnings
         d["cv_words"] = sum(doc["words"] for doc in d["documents"][self.mode])
@@ -422,7 +438,9 @@ def load() -> Settings:
         with open(settings_path(), encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, ValueError):
-        return Settings()
+        # A first run: the Codex signed in on this computer answers with no key to paste (2026-11-05).
+        from .llm.codex import codex_ready
+        return Settings(vendor="codex") if codex_ready() else Settings()
     known = {k: v for k, v in data.items() if k in Settings.__dataclass_fields__}
     s = Settings(**known)
     # A file from before an action existed gets that action's default; a file edited by hand into

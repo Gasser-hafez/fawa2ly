@@ -46,6 +46,12 @@ async def probe_model(vendor: str, model: Optional[str], timeout: float = 20.0) 
     llm = None
     try:
         llm = OpenAICompatibleLLM.from_env(vendor, model)
+        if llm.name == "codex":
+            # signed in and offered this model: proved without spending a request on an answer
+            if llm.model not in await asyncio.wait_for(llm.list_models(), timeout):
+                raise RuntimeError(f"{llm.model} is not offered to this Codex account")
+            _verified[(vendor, llm.model)] = time.monotonic()
+            return {"vendor": vendor, "model": llm.model, "ok": True, "ms": round((time.monotonic() - t0) * 1000)}
         kwargs = {"model": llm.model, "messages": [{"role": "user", "content": PROBE_PROMPT}],
                   llm.token_param: PROBE_TOKENS}
         if llm.temperature is not None:

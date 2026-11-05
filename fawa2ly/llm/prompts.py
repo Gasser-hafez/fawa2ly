@@ -80,7 +80,8 @@ Mode note: the call's mode is a first choice, interview or meeting, and each has
 
 from typing import Optional
 
-from ..limits import DIRECTION_WORDS, KEYWORD_WORDS, MAX_BULLET_WORDS, MAX_BULLETS, STYLE_MARK
+from ..limits import (DIRECTION_WORDS, KEYWORD_WORDS, MAX_BULLET_WORDS, MAX_BULLETS, SEARCH_MARK,
+                      SEARCH_QUERY_WORDS, SEARCH_RESULT_WORDS, STYLE_MARK)
 
 # The three shapes an answer can take, then "dynamic", which is not a fourth shape but a choice
 # between the three, made per question by the model (roadmap item 27).
@@ -325,6 +326,63 @@ NEGOTIATION_RULE = {
         "Trade rather than refuse: what could be dropped, moved or resourced instead, named specifically.",
         *_NEGOTIATE_SHARED]),
 }
+
+
+# Web search during a call (roadmap item 10, 2026-09-12). The rule goes at the end of the system
+# prompt only when search is on for the call, so a call without it sends the prompt that was rated.
+# It asks for the search as a last line so the answer's own lines are never held back for it: the
+# guardrail keeps that line off the screen and the search runs once they are shown.
+#
+# 2026-09-12, first live run (Tavily, gemini-3.5-flash-lite, 6 questions): the model asked for a search
+# on both English questions about recent news but still wrote a recent launch into its first lines
+# before the search ran, missed the same question in Egyptian Arabic and invented one there, and put
+# its training years ("2023 2024") into a query. The rule now forbids the claim itself, says the line
+# is asked for in any language, and keeps years out of queries.
+NO_YEAR = "Do not put a year in the query unless the conversation names one."
+SEARCH_RULE = (f"Web search is on for this call. When a good answer needs a current, public fact that is not in "
+               f"the conversation or anywhere above (what a company has launched, announced or changed lately, "
+               f"its latest results, a recent release, a price or a date that changes), end with one more line: "
+               f"'{SEARCH_MARK} ' and a web search query of at most {SEARCH_QUERY_WORDS} words. {NO_YEAR} That "
+               f"line starts with '{SEARCH_MARK}' whatever language the conversation is in. It is never shown; "
+               f"the search runs once your other lines are on screen and adds lines from what it finds. Until "
+               f"then your other lines state no such fact: nothing about what they launched, announced or "
+               f"changed recently, no version number and no recent figure, not even as something seen or "
+               f"heard. They stand without it, on why it matters and what the speaker brings to it. Never "
+               f"write that line for anything else.")
+
+
+def _listed(shown: list[str]) -> str:
+    return "\n".join(f"- {line}" for line in shown)
+
+
+QUERY_INSTRUCTION = "Reply with one line only"
+
+
+def query_request(question: str, shown: list[str]) -> str:
+    """The Search button on an answer that did not ask for a search: the query, and nothing else."""
+    return (f"{question}\n\nAlready on screen:\n{_listed(shown)}\n\n"
+            f"They want a web search for current facts that would strengthen this answer. {QUERY_INSTRUCTION}: "
+            f"'{SEARCH_MARK} ' and a web search query of at most {SEARCH_QUERY_WORDS} words that names the "
+            f"company, product or topic from the conversation. {NO_YEAR}")
+
+
+def _clip(text: str, words: int = SEARCH_RESULT_WORDS) -> str:
+    cut = text.split()
+    return " ".join(cut[:words]) + (" ..." if len(cut) > words else "")
+
+
+def search_request(question: str, shown: list[str], results, mode: str = "interview") -> str:
+    """The question again, with the lines on screen and what a web search found, for lines that add
+    it. `results` are search results (title, site, content). On a sales call the product's own
+    facts still come only from the product information, whatever a page says about it."""
+    found = "\n\n".join(f"{i}. {r.title} ({r.site})\n{_clip(r.content)}" for i, r in enumerate(results, 1))
+    own = (" Facts about the representative's own product, its prices and its terms still come only from "
+           "the product information." if mode == "sales" else "")
+    return (f"{question}\n\nAlready on screen:\n{_listed(shown)}\n\nFrom a web search just now:\n{found}\n\n"
+            f"Give 2 or 3 more lines that add what these results say and the lines on screen do not. Use "
+            f"only facts that are in the results, said the way a person says them in conversation, without "
+            f"web addresses.{own} Do not repeat or rephrase the lines on screen. If the results add nothing "
+            f"useful to this answer, give no lines.")
 
 
 ASKED_LEAD = "They were just asked:"

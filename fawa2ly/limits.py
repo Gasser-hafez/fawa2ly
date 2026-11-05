@@ -58,6 +58,18 @@ MAX_UPLOAD_BYTES = 10 * 2**20
 # never shown.
 STYLE_MARK = "STYLE:"
 
+# Web search during a call (roadmap item 10, 2026-09-12). A model that needs a current fact ends its
+# answer with a line that starts with SEARCH_MARK and holds a query of at most SEARCH_QUERY_WORDS
+# words; the guardrail keeps that line off the screen and the search runs once the answer is there.
+# SEARCH_LIMIT caps one call (Tavily's free plan has 1,000 searches a month), SEARCH_RESULTS is how
+# many pages are read, and each page's extract is cut to SEARCH_RESULT_WORDS, so the results add at
+# most about 400 words to the request that turns them into lines.
+SEARCH_MARK = "SEARCH:"
+SEARCH_QUERY_WORDS = 8
+SEARCH_LIMIT = 10
+SEARCH_RESULTS = 5
+SEARCH_RESULT_WORDS = 80
+
 # A recap (roadmap item 17) of a call the user looked away from. Every other request carries the last
 # few turns; a recap that carried only those would recap the part they just heard, which is the one
 # part they do not need. It gets the call so far, bounded by words rather than turns because turns

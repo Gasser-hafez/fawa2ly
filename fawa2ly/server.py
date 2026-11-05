@@ -18,6 +18,7 @@ goes out as one JSON message, and the UI sends back commands.
                    {"cmd": "retry", "n": 3}              ask question 3 again
                    {"cmd": "provider", "vendor": "gemini", "model": null}   switch models mid-call
                    {"cmd": "more", "n": 3}               two or three more lines for question 3
+                   {"cmd": "search", "n": 3}             lines from a web search for question 3
                    {"cmd": "action", "kind": "recap"}    say | recap | ask opens a card; shorter needs "n"
                    {"cmd": "jobfit", "description": "..."}  compare a job description with the CV
                    {"cmd": "settings", "values": {...}}  save choices; every window gets "settings"
@@ -185,6 +186,8 @@ def config_from(base: EngineConfig, chosen: dict) -> EngineConfig:
         cfg.transcript_dir = user_settings.transcripts_dir()
     cfg.feedback = saved.live_feedback            # roadmap item 9, off unless turned on
     cfg.negotiation = saved.negotiation           # roadmap item 25, off unless turned on
+    cfg.web_search = saved.web_search             # roadmap item 10, off unless turned on
+    cfg.hotkey_only = saved.hotkey_only           # answers only on Ctrl+1 ("say"), off unless turned on
     # roadmap item 26: deepgram (default) or whisper (offline). Precedence is CLI flag > saved
     # setting > default: a flag left at its default cannot be told from one not given, so the saved
     # setting fills in only while the flag is at the default (it used to overwrite the flag, and
@@ -581,6 +584,14 @@ class SessionServer:
                 self.engine.more(int(msg.get("n")))
             except (TypeError, ValueError):
                 await ws.send(json.dumps({"type": "error", "text": "more needs a question number"}))
+        elif cmd == "search":
+            if self.engine is None or not hasattr(self.engine, "search"):
+                await ws.send(json.dumps({"type": "error", "text": "no session to search for"}))
+                return
+            try:
+                self.engine.search(int(msg.get("n")))
+            except (TypeError, ValueError):
+                await ws.send(json.dumps({"type": "error", "text": "search needs a question number"}))
         elif cmd == "action":
             if self.engine is None or not hasattr(self.engine, "action"):
                 await ws.send(json.dumps({"type": "error", "text": "no session for that"}))
@@ -670,6 +681,10 @@ class SessionServer:
                 changed["live_feedback"] = bool(changed["live_feedback"])
             if "negotiation" in changed:
                 changed["negotiation"] = bool(changed["negotiation"])
+            if "web_search" in changed:
+                changed["web_search"] = bool(changed["web_search"])
+            if "hotkey_only" in changed:
+                changed["hotkey_only"] = bool(changed["hotkey_only"])
             if "stt_vendor" in changed and changed["stt_vendor"] not in ("deepgram", "whisper"):
                 raise ValueError(f"unknown stt_vendor: {changed['stt_vendor']!r}")
             if "whisper_model" in changed:
