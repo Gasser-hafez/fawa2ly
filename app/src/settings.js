@@ -797,7 +797,7 @@ $("save-transcripts").addEventListener("change", () =>
 $("live-feedback").addEventListener("change", () =>
   save({ live_feedback: $("live-feedback").checked }, nextCall()));
 $("hotkey-only").addEventListener("change", () =>
-  save({ hotkey_only: $("hotkey-only").checked }, nextCall()));
+  save({ hotkey_only: $("hotkey-only").checked }));
 $("web-search").addEventListener("change", () =>
   save({ web_search: $("web-search").checked }, nextCall()));
 $("negotiation").addEventListener("change", () =>

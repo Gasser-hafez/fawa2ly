@@ -705,6 +705,10 @@ class SessionServer:
             except Exception as e:
                 await ws.send(json.dumps({"type": "error", "text": f"could not change the answer style: {e}"}))
                 return
+        # At once, not from the next call (2026-11-06): it was turned off mid-call and the questions
+        # after it still went unanswered, which read as the model not working.
+        if "hotkey_only" in changed and getattr(getattr(self.engine, "suggester", None), "hotkey_only", None) is not None:
+            self.engine.suggester.hotkey_only = changed["hotkey_only"]
         for k, v in changed.items():
             setattr(s, k, v)
         user_settings.save(s)

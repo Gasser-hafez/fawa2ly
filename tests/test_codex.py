@@ -95,3 +95,19 @@ def test_hotkey_only_answers_nothing_heard_but_the_say_action_uses_it():
     assert s.history and "Why do you want this job?" in s.history[-1][1]
     card = asyncio.run(s.action("say"))
     assert card is not None and s.n == 1
+
+
+def test_turning_hotkey_only_off_during_a_call_answers_the_next_question_at_once(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from fawa2ly.server import SessionServer
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    server = SessionServer(lambda chosen, emit: None, host="127.0.0.1", port=0)
+    suggester = Suggester(FakeLLM())
+    suggester.hotkey_only = True
+    server.engine = SimpleNamespace(suggester=suggester)
+
+    class Ws:
+        async def send(self, text):
+            raise AssertionError(text)
+    asyncio.run(server.handle_settings(Ws(), {"hotkey_only": False}))
+    assert suggester.hotkey_only is False
