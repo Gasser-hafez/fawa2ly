@@ -236,10 +236,21 @@
           <div class="group">
             <h3>During the call</h3>
             <label class="check">
+              <input type="checkbox" id="hotkey-only" />
+              <span>Answer only when I press Ctrl+1</span>
+            </label>
+            <p class="hint">Questions you are asked are not answered on their own. The call is still transcribed, and pressing the What should I say? hotkey (Ctrl+1 unless you changed it, under Hotkeys) sends the conversation so far to the model and asks what to say. Fewer requests, and nothing appears until you ask. Applies from the next call.</p>
+            <label class="check">
               <input type="checkbox" id="live-feedback" />
               <span>Live feedback on my answers</span>
             </label>
             <p class="hint">Needs your microphone transcribed, under Listening. When the other side speaks again after one of your answers, the saved model says whether it was on point, missed the point, ran long or drifted, with a short note. One extra request per answer, at most 20 a call, sent only while no answer is being written. Applies from the next call.</p>
+            <label class="check">
+              <input type="checkbox" id="web-search" />
+              <span>Search the web during a call</span>
+            </label>
+            <p class="hint">Needs a Tavily key, under API keys, or Codex signed in on this computer (no key needed; slower). Each answer gets a Search the web button, and the model can ask for a search itself when an answer needs a current fact. A search starts only once the first lines are on screen, takes a few seconds and adds a few lines. It sends a short query written from the conversation. At most 10 searches a call; Tavily's free plan has 1,000 a month. Applies from the next call.</p>
+            <p id="web-search-key" class="warning" hidden>No Tavily key and no Codex signed in: add a key under API keys, or sign in to Codex.</p>
             <label class="check">
               <input type="checkbox" id="negotiation" />
               <span>Negotiation help: this call is about pay or price</span>

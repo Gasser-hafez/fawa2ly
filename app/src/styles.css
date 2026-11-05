@@ -660,6 +660,23 @@ select option { background: var(--panel-solid); color: var(--ink); }
 
 .actions.more { padding-inline: var(--s3); }
 .actions.more button { font-size: 12px; padding: 5px 12px; }
+.actions.more { display: flex; gap: var(--s2); flex-wrap: wrap; }
+
+/* ---------- web search (roadmap item 10) ----------
+   One quiet line under the answer: what is being searched, then the sites the added lines came from. */
+.web {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px var(--s2); padding-inline: var(--s3);
+  font-size: 12px; line-height: 1.4; color: var(--ink-3);
+}
+.web-state { flex: none; font-weight: 600; color: var(--ink-2); }
+.web[data-state="searching"] .web-state::before {
+  content: ""; display: inline-block; width: 5px; height: 5px; margin-inline-end: 6px; vertical-align: middle;
+  border-radius: 50%; background: var(--accent); animation: breathe 1.4s ease-in-out infinite;
+}
+.web[data-state="failed"] .web-state { color: var(--warm-ink); }
+.web-query { min-width: 0; overflow-wrap: anywhere; font-style: italic; }
+.web-sources { flex-basis: 100%; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.web-sources:empty { display: none; }
 
 .field input[type="text"],
 .field input[type="password"] {

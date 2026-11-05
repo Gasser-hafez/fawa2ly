@@ -29,6 +29,9 @@ Everything a front end needs arrives through one callback as a plain dict with a
                 results; only when their microphone is transcribed (roadmap item 8)
     feedback    a verdict on one of the user's answers (on_point, missed_point, ran_long, drifted)
                 and a short note, when live feedback is on (roadmap item 9)
+    search      a web search for one question (roadmap item 10): state "searching" (query empty
+                while the model writes one), "found" with the sources, or "failed" with the
+                reason; the lines it adds arrive as `line` events and an `assist` marked web
     summary     once, when the call ends: questions heard, lines shown, time to the first line,
                 and where the transcript went if one was kept (roadmap item 6)
 
@@ -53,6 +56,7 @@ from .console import CLEAR, safe_console
 from .context import ContextBuilder, Preset, load_cv
 from .llm import FakeLLM, OpenAICompatibleLLM, mute_asyncgen_close_noise
 from .pipeline import Pipeline
+from .search import FakeSearch, make_searcher
 from .session import consume
 from .feedback import Coach
 from .pace import PaceMeter
@@ -93,6 +97,8 @@ class EngineConfig:
     transcript_dir: Optional[str] = None    # roadmap item 6: keep the call's transcript here; None = not kept
     feedback: bool = False              # roadmap item 9: a verdict on each answer (needs suggest and user_mic)
     negotiation: bool = False           # roadmap item 25: a pay or price talk; adds the negotiation rule
+    web_search: bool = False            # roadmap item 10: search the web for a question (Tavily key or Codex)
+    hotkey_only: bool = False           # answer only on the "say" action (Ctrl+1), never on a question heard
 
     def raw(self) -> str:
         return self.raw_path or side_path(self.log_path, ".raw.jsonl")
@@ -254,6 +260,17 @@ class Engine:
         if self.suggester is not None:
             self._spawn(self.suggester.more(n))
 
+    def search(self, n: int) -> None:
+        """Lines from a web search for question `n` (the card's Search button, roadmap item 10).
+        Ignored when this call has no search."""
+        if self.suggester is not None and self.suggester.searcher is not None:
+            self._spawn(self.suggester.search(n))
+
+    @property
+    def _searching(self) -> bool:
+        """Whether this call can search the web, for the overlay's Search button (roadmap item 10)."""
+        return self.suggester is not None and self.suggester.searcher is not None
+
     def action(self, kind: str, n: Optional[int] = None) -> None:
         """An on-demand button (roadmap item 17): say, recap, ask, or shorter for question `n`."""
         if self.suggester is not None:
@@ -320,6 +337,8 @@ class Engine:
             if p is not None:
                 await p.close()
         self._retired = []
+        if self.suggester is not None and self.suggester.searcher is not None:
+            await self.suggester.searcher.close()           # web search's connection (roadmap item 10)
 
     def emit(self, event: dict) -> None:
         self.record.observe(event)
@@ -424,7 +443,8 @@ class Engine:
     # ---- construction ----
     def _build_suggester(self, assist_log) -> Suggester:
         provider = (FakeLLM(first_token_delay=self.cfg.fake_delay or 0.05,
-                            token_delay=0.35 if self.cfg.fake_delay else 0.002)
+                            token_delay=0.35 if self.cfg.fake_delay else 0.002,
+                            search_query="example company latest news" if self.cfg.web_search else None)
                     if self.cfg.fake_llm
                     else MeteredProvider(OpenAICompatibleLLM.from_env(self.cfg.vendor, self.cfg.llm_model)))
         self.provider = provider          # held at once, so a failure below (a missing role) still closes it
@@ -436,14 +456,34 @@ class Engine:
         # here carries how much background the model actually has, so the overlay can
         self.cv_words = len(builder.cv_text.split())
         builder.negotiation = self.cfg.negotiation     # roadmap item 25, off unless turned on
-        return Suggester(provider, builder, log=assist_log,
+        searcher = self._build_searcher()
+        builder.web_search = searcher is not None      # the prompt offers search only when there is one
+        suggester = Suggester(provider, builder, log=assist_log,
                          on_result=lambda a: self.emit({"type": "assist", "assist": a.to_json()}),
                          on_line=lambda n, text: self.emit({"type": "line", "n": n, "text": text}),
                          on_question=lambda n, text: self.emit({"type": "question", "n": n, "text": text,
                                                                 # the action that opened it, "" for a
                                                                 # question that was actually heard
                                                                 "action": self.suggester.action_cards.get(n, "")}),
-                         on_style=lambda n, style: self.emit({"type": "style", "n": n, "style": style}))
+                         on_style=lambda n, style: self.emit({"type": "style", "n": n, "style": style}),
+                         searcher=searcher, spawn=self._spawn,
+                         on_search=lambda n, info: self.emit({"type": "search", "n": n, **info}))
+        suggester.hotkey_only = self.cfg.hotkey_only
+        return suggester
+
+    def _build_searcher(self):
+        """Web search for this call (roadmap item 10): only when turned on, and only with a Tavily key
+        or Codex signed in. Neither does not stop the call; the log says why search is off. The fake
+        model gets the fake search, so the overlay can be worked on with neither."""
+        if not self.cfg.web_search:
+            return None
+        if self.cfg.fake_llm:
+            return FakeSearch(delay=1.5 if self.cfg.fake_delay else 0.0)
+        try:
+            return make_searcher()
+        except RuntimeError as e:
+            self._log(f"[search] web search is off for this call: {e}")
+            return None
 
     def _coach_if_asked(self) -> Optional[Coach]:
         """Live feedback (item 9) needs the user's words and a model: only with feedback turned on,
@@ -542,7 +582,8 @@ class Engine:
                            "provider": None if self.provider is None
                            else f"{self.provider.name}/{self.provider.model}",
                            "replay": self.cfg.replay, "cv_words": self.cv_words, "style": self.cfg.style,
-                           "mode": self.suggester.builder.mode if self.suggester is not None else self.cfg.mode})
+                           "mode": self.suggester.builder.mode if self.suggester is not None else self.cfg.mode,
+                           "web_search": self._searching})
                 listening = True
                 task = asyncio.create_task(self._consumer(
                     _Pausable(FakeSTT(self.cfg.replay, realtime=True), self), "other", log))
@@ -631,7 +672,8 @@ class Engine:
                            "provider": None if self.provider is None
                            else f"{self.provider.name}/{self.provider.model}",
                            "cv_words": self.cv_words, "style": self.cfg.style,
-                           "mode": self.suggester.builder.mode if self.suggester is not None else self.cfg.mode})
+                           "mode": self.suggester.builder.mode if self.suggester is not None else self.cfg.mode,
+                           "web_search": self._searching})
                 listening = True
                 self._log("[stt] connected - talk / play something. Ctrl+C to stop."
                           + (f" Auto-stop in {cfg.seconds:g} s." if cfg.seconds else "") + "\n")

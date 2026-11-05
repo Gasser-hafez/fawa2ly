@@ -28,7 +28,7 @@ import yaml
 
 from ..limits import DEFAULT_MAX_TOKENS
 from ..llm.base import SuggestionRequest
-from ..llm.prompts import ASKED_LEAD, MODES, NEGOTIATION_RULE, STYLES, system_for
+from ..llm.prompts import ASKED_LEAD, MODES, NEGOTIATION_RULE, SEARCH_RULE, STYLES, system_for
 
 
 def bundled_path(*parts: str) -> str:
@@ -278,6 +278,7 @@ class ContextBuilder:
         # is what the command line and older callers pass.
         self.documents: list[tuple[str, str]] = []
         self.negotiation = False                   # this call is a pay or price talk (roadmap item 25)
+        self.web_search = False                    # the model may ask for a web search (roadmap item 10)
         self.set_documents(([("", cv_text)] if cv_text else []) + list(documents or []))
         self.history_turns = history_turns
         self.style = style if style in STYLES else "full"
@@ -336,6 +337,9 @@ class ContextBuilder:
         if self.negotiation:
             # after the documents, so "the documents" in it means everything above
             parts.append(NEGOTIATION_RULE[self.mode])
+        if self.web_search:
+            # last, so "anything above" is everything; a call without search sends the rated prompt
+            parts.append(SEARCH_RULE)
         return "\n\n".join(parts)
 
     def build(self, question: str, history: Optional[list[tuple[str, str]]] = None,

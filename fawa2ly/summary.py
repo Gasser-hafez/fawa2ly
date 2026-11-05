@@ -15,6 +15,9 @@ silence that closes a turn) plus the wall time from the question appearing to it
 question asked again (Retry after a failure, or a question that turned out longer) keeps the time
 it was first asked: the user waited through the failure too.
 
+A web search (roadmap item 10) is kept with its question: the query, the sites it read or why it
+failed. `searches` counts the searches that were sent, not the ones refused before sending.
+
 On the Dynamic profile (roadmap item 27) each question also keeps the shape the model chose for it,
 so a saved call says what it was actually handed - which is the only way to judge, after a real call
 rather than an eval, whether that judgement was any good.
@@ -43,6 +46,7 @@ class CallRecord:
         self.questions: dict[int, dict] = {}
         self.turns: list[dict] = []          # what both sides said, in order, for the transcript
         self.pace: dict = {}                 # the user's last pace event (roadmap item 8)
+        self.searches = 0                    # web searches sent (roadmap item 10)
 
     def observe(self, event: dict) -> None:
         kind = event.get("type")
@@ -61,7 +65,7 @@ class CallRecord:
             if q is None:
                 q = self.questions[n] = {"n": n, "question": "", "lines": [], "error": None,
                                          "t_asked": now, "t_first_line": None, "end_to_fire_ms": None,
-                                         "feedback": None, "style": ""}
+                                         "feedback": None, "search": None, "style": ""}
             else:
                 q["lines"], q["error"] = [], None     # asked again: the card on screen starts over
             q["question"] = event.get("text") or q["question"]
@@ -89,6 +93,16 @@ class CallRecord:
             q = self.questions.get(event.get("n"))
             if q is not None:                         # live feedback on the user's answer (item 9)
                 q["feedback"] = {"verdict": event.get("verdict"), "note": event.get("note", "")}
+        elif kind == "search":
+            state, query = event.get("state"), event.get("query") or ""
+            if state not in ("found", "failed"):
+                return
+            if query:                                 # sent; a refusal before sending has no query
+                self.searches += 1
+            q = self.questions.get(event.get("n"))
+            if q is not None:
+                q["search"] = {"query": query, "error": event.get("error") if state == "failed" else None,
+                               "sites": [s.get("site", "") for s in event.get("sources") or []]}
         elif kind == "pace":
             self.pace = {k: event.get(k) for k in ("average_wpm", "fillers", "words")}
         elif kind == "utterance":
@@ -112,7 +126,7 @@ class CallRecord:
                 first = round((q["t_first_line"] - q["t_asked"]) * 1000) + (q["end_to_fire_ms"] or 0)
             questions.append({"n": n, "question": q["question"], "lines": list(q["lines"]),
                               "first_line_ms": first, "error": None if q["lines"] else q["error"],
-                              "feedback": q["feedback"], "style": q["style"]})
+                              "feedback": q["feedback"], "search": q["search"], "style": q["style"]})
         times = [q["first_line_ms"] for q in questions if q["first_line_ms"] is not None]
         return {
             "started": datetime.datetime.fromtimestamp(start).isoformat(timespec="seconds"),
@@ -125,6 +139,7 @@ class CallRecord:
             "has_you": any(t["who"] == "you" for t in self.turns),   # item 7 can only review these
             "you_wpm": self.pace.get("average_wpm"),                 # item 8: the whole call's pace
             "you_fillers": self.pace.get("fillers"),                 # None when not counted (not English)
+            "searches": self.searches,                               # item 10
             "median_first_line_ms": round(statistics.median(times)) if times else None,
             "slowest_first_line_ms": max(times) if times else None,
         }

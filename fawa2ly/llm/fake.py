@@ -10,8 +10,9 @@ import re
 import time
 from typing import AsyncIterator, Optional
 
-from ..limits import STYLE_MARK
+from ..limits import SEARCH_MARK, STYLE_MARK
 from .base import SuggestionEvent, SuggestionProvider, SuggestionRequest
+from .prompts import QUERY_INSTRUCTION
 
 # Spoken sentences, because that is what the product shows now (prompt v2.0, 2026-09-10). The
 # previous canned bullets were keyword-era ("biggest strength: attention to detail") and the
@@ -43,7 +44,7 @@ class FakeLLM(SuggestionProvider):
 
     def __init__(self, bullets: Optional[list[str]] = None, first_token_delay: float = 0.0,
                  token_delay: float = 0.0, model: str = "fake-1", error: Optional[str] = None,
-                 finish_reason: str = "stop",
+                 finish_reason: str = "stop", search_query: Optional[str] = None,
                  shape: Optional[str] = None):
         self.given_bullets = bullets
         self.bullets = DEFAULT_BULLETS if bullets is None else bullets
@@ -52,6 +53,9 @@ class FakeLLM(SuggestionProvider):
         self.model = model
         self.error = error
         self.finish_reason = finish_reason
+        # Web search (roadmap item 10): when set, a request for a search query gets this one, so the
+        # Search button works end to end with no key. None answers it like any other request.
+        self.search_query = search_query
         # Dynamic (roadmap item 27): when the prompt asks the model to name the shape it chose, the
         # fake names one and answers in it, taking the next shape each time it is asked. Set
         # `shape` to pin it to one. `bullets` given explicitly still wins: a test says what it means.
@@ -65,7 +69,9 @@ class FakeLLM(SuggestionProvider):
             yield SuggestionEvent("error", time.time(), self.error, model=self.model)
             return
         bullets = self.bullets
-        if self.given_bullets is None and STYLE_MARK in req.system:
+        if self.search_query and QUERY_INSTRUCTION in req.question:
+            bullets = [f"{SEARCH_MARK} {self.search_query}"]
+        elif self.given_bullets is None and STYLE_MARK in req.system:
             shape = self.shape or SHAPE_ORDER[len(self.shapes_answered) % len(SHAPE_ORDER)]
             self.shapes_answered.append(shape)
             bullets = [f"{STYLE_MARK} {shape}", *SHAPE_BULLETS[shape]]

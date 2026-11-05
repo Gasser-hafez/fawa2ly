@@ -7,6 +7,8 @@ rather than discarded silently, so a prompt regression shows up as a rising drop
 of a quieter overlay.
 
 A bullet is refused when it is:
+  search         the model asking for a web search ("SEARCH: acme quarterly results"), which is
+                 read by the suggester and never shown (roadmap item 10, 2026-09-12)
   style          the shape the model chose for this answer ("STYLE: keywords"), on the Dynamic
                  profile, read by the suggester and never shown (roadmap item 27, 2026-09-13)
   too_long       over the word limit (the overlay cannot show it while someone is listening)
@@ -27,7 +29,8 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-from ..limits import (DIRECTION_WORDS, KEYWORD_WORDS, MAX_BULLETS, MAX_BULLET_WORDS, STYLE_MARK)
+from ..limits import (DIRECTION_WORDS, KEYWORD_WORDS, MAX_BULLETS, MAX_BULLET_WORDS, SEARCH_MARK,
+                      STYLE_MARK)
 
 MAX_WORDS = MAX_BULLET_WORDS        # the product rule; see fawa2ly/limits.py
 # "dynamic" is what an answer is filtered by until the model says which shape it chose, and when it
@@ -46,6 +49,10 @@ _LABEL_PREFIX = re.compile(r"^\W*[A-Za-z][\w'/&-]*(?:[ ,-][\w'/&-]+){0,3}:\s+\S"
 # digits, so every Arabic line reduced to an empty key and each one after the first was dropped
 # as a "duplicate" of it: an Arabic answer showed one line at most.
 _NORMALISE = re.compile(r"[^\w ]+")
+# The model's ask for a web search. Case and the bold or quotes some models put around it are
+# tolerated; a line that only starts with the mark is still never shown.
+_SEARCH_LINE = re.compile(r"^[\W_]*" + re.escape(SEARCH_MARK.rstrip(":")) + r"[\s*_]*:[\s*\"'`]*(.*?)[\s*\"'`]*$",
+                          re.IGNORECASE)
 # The shape the model chose, on the Dynamic profile. Tolerates the bold
 # and the quotes models put around a marker, and a trailing full stop, because this line arrives
 # before any answer and a marker that is not recognised costs the whole shape.
@@ -63,6 +70,14 @@ def _key(text: str) -> str:
     return _NORMALISE.sub("", text.lower()).strip()
 
 
+def search_query(line: str) -> Optional[str]:
+    """The query in a "SEARCH: ..." line, or None when the line is not one or has no query."""
+    m = _SEARCH_LINE.match(line.strip())
+    if m is None:
+        return None
+    return " ".join(m.group(1).split()) or None
+
+
 def style_choice(line: str) -> Optional[str]:
     """The shape named in a "STYLE: keywords" line, or None when the line is not one or names
     something that is not a shape."""
@@ -78,6 +93,8 @@ def reason_to_drop(bullet: str, style: str = "full") -> str | None:
     text = bullet.strip()
     if not text:
         return "empty"
+    if _SEARCH_LINE.match(text):
+        return "search"
     if _STYLE_LINE.match(text):
         return "style"
     if len(text.split()) > WORD_LIMIT.get(style, MAX_WORDS):

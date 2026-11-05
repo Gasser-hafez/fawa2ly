@@ -128,6 +128,10 @@ function render(s) {
   $("save-transcripts").checked = Boolean(c.save_transcripts);
   $("live-feedback").checked = Boolean(c.live_feedback);
   $("negotiation").checked = Boolean(c.negotiation);
+  $("hotkey-only").checked = Boolean(c.hotkey_only);
+  // web search (roadmap item 10): turned on with neither a key nor Codex does nothing, so say so here
+  $("web-search").checked = Boolean(c.web_search);
+  $("web-search-key").hidden = !(c.web_search && !(c.keys || {}).TAVILY_API_KEY && !c.codex);
   const transcripts = c.transcripts || {};
   $("transcripts-state").textContent = transcripts.count
     ? `${transcripts.count} saved in ${transcripts.folder}` : "None saved.";
@@ -792,6 +796,10 @@ $("save-transcripts").addEventListener("change", () =>
   save({ save_transcripts: $("save-transcripts").checked }, nextCall()));
 $("live-feedback").addEventListener("change", () =>
   save({ live_feedback: $("live-feedback").checked }, nextCall()));
+$("hotkey-only").addEventListener("change", () =>
+  save({ hotkey_only: $("hotkey-only").checked }, nextCall()));
+$("web-search").addEventListener("change", () =>
+  save({ web_search: $("web-search").checked }, nextCall()));
 $("negotiation").addEventListener("change", () =>
   save({ negotiation: $("negotiation").checked }, nextCall()));
 let deleteArmed = null;
@@ -855,6 +863,7 @@ function renderDevices() {
 
 function keyLabel(name) {
   if (name === "DEEPGRAM_API_KEY") return "Deepgram, to listen";
+  if (name === "TAVILY_API_KEY") return "Tavily, to search the web";
   return `${name.replace(/_API_KEY$/, "").toLowerCase()} model`;
 }
 
@@ -930,6 +939,7 @@ function provButton(text, primary, onClick) {
 
 function provState(p) {
   if (!p.enabled) return ["", "Off"];
+  if (p.codex && !p.ready) return ["", "Sign in to Codex first"];
   if (!p.key_optional && !p.key_set) return ["", "Needs a key"];
   if (!p.model) return ["partial", "Pick a model"];
   return ["ready", "Ready"];
@@ -975,10 +985,17 @@ function buildProvider(p) {
     keyRow.append(keyField);
     body.append(keyRow);
   }
-  const where = document.createElement("div");
-  where.className = "row2";
-  where.append(provField("Address", "text", "base_url", ""), provField("Temperature", "text", "temperature", ""));
-  body.append(where);
+  if (p.codex) {
+    const how = document.createElement("p");
+    how.className = "hint";
+    how.textContent = "Uses the Codex app on this computer and the ChatGPT plan it is signed in with: no key to paste. What is said on the call is sent to OpenAI.";
+    body.append(how);
+  } else {
+    const where = document.createElement("div");
+    where.className = "row2";
+    where.append(provField("Address", "text", "base_url", ""), provField("Temperature", "text", "temperature", ""));
+    body.append(where);
+  }
 
   const modelRow = document.createElement("div");
   modelRow.className = "row2";

@@ -19,6 +19,12 @@ the same number live and replayed, which is what makes offline tuning meaningful
 Only the other party's speech is answered. The user's own microphone (`stream="user"`) is
 recorded as history and never triggers a suggestion.
 
+**Web search** (roadmap item 10, 2026-09-12) comes after an answer, never before it: a search adds
+seconds, and the first lines are what the user is waiting for. When search is on, the model may end
+its answer with "SEARCH: <query>"; the guardrail keeps that line off the screen, and once the answer
+is recorded the search runs and its lines are added to the card, as More's are. The card's Search
+button does the same for any answer, with a query the model writes first when the answer asked for
+none.
 """
 
 from __future__ import annotations
@@ -29,13 +35,15 @@ import time
 from dataclasses import asdict, dataclass, field
 from typing import Callable, Optional, TextIO
 
-from .limits import DEFAULT_MAX_TOKENS, RECAP_WORDS
+from .limits import DEFAULT_MAX_TOKENS, RECAP_WORDS, SEARCH_LIMIT
 from .pipeline import normalize_question
-from .llm.prompts import ACTION_LEAD, ACTIONS, DYNAMIC, more_request, shorter_request
+from .llm.prompts import (ACTION_LEAD, ACTIONS, DYNAMIC, more_request, query_request, search_request,
+                          shorter_request)
 from .context import ContextBuilder, filter_bullets
-from .context.guardrail import style_choice
+from .context.guardrail import search_query, style_choice
 from .llm.base import Suggestion, SuggestionProvider, collect
 from .pipeline import Utterance
+from .search import SearchProvider
 
 # Triggers that mean "the detector decided this was a question", as opposed to a flush caused by
 # silence or by the other speaker starting.
@@ -67,6 +75,9 @@ class Assist:
     style: str = ""                     # the shape this answer took: full | keywords | direction
     chose_style: bool = False           # on Dynamic, whether the model said which (roadmap item 27)
     more: bool = False                  # lines added by the More button to an answer already shown
+    web: bool = False                   # lines added from a web search (roadmap item 10)
+    search_query: Optional[str] = None  # what was searched, or what this answer asked to search for
+    sources: list[dict] = field(default_factory=list)   # {title, url, site} of the pages the lines used
 
     def to_json(self) -> dict:
         return asdict(self)
@@ -83,7 +94,9 @@ def speaker_label(u: Utterance) -> str:
 class Suggester:
     """Feed it every utterance; it answers the questions.
 
-    on_result is called with each finished Assist, for the UI or the console.
+    on_result is called with each finished Assist, for the UI or the console. on_search is called
+    with (question number, {"state": ...}) as a web search goes, and `spawn` starts the search an
+    answer asked for in the background (the engine passes its own, so shutdown waits for it).
     """
 
     def __init__(self, provider: SuggestionProvider, builder: Optional[ContextBuilder] = None,
@@ -92,7 +105,10 @@ class Suggester:
                  on_line: Optional[Callable[[int, str], None]] = None,
                  on_question: Optional[Callable[[int, str], None]] = None,
                  on_style: Optional[Callable[[int, str], None]] = None,
-                 max_history: int = 6, max_tokens: int = DEFAULT_MAX_TOKENS):
+                 max_history: int = 6, max_tokens: int = DEFAULT_MAX_TOKENS,
+                 searcher: Optional[SearchProvider] = None,
+                 on_search: Optional[Callable[[int, dict], None]] = None,
+                 spawn: Optional[Callable] = None, search_limit: int = SEARCH_LIMIT):
         self.provider = provider
         self.builder = builder or ContextBuilder()
         self.log = log
@@ -102,6 +118,7 @@ class Suggester:
         self.on_style = on_style
         self.max_history = max_history
         self.max_tokens = max_tokens
+        self.hotkey_only = False                 # answer only when asked (2026-11-05), never on a question heard
         self.history: list[tuple[str, str]] = []
         self.said: list[tuple[str, str]] = []    # the call so far, for a recap; bounded by RECAP_WORDS
         self.said_words = 0
@@ -111,6 +128,13 @@ class Suggester:
         self.generation: dict[int, int] = {}     # question n -> latest request; older ones go quiet
         self.spec: dict[str, dict] = {}          # turn mode: early asks, keyed by normalized text
         self.shown_lines: dict[int, list[str]] = {}   # question n -> lines on screen, for More
+        self.searcher = searcher
+        self.on_search = on_search
+        self.spawn = spawn or asyncio.ensure_future
+        self.search_limit = search_limit
+        self.searches = 0                        # web searches started this call
+        self.searched: set[int] = set()          # questions searched already: one search each
+        self.search_asks: dict[int, str] = {}    # question n -> the query its answer asked for
         self.action_cards: dict[int, str] = {}    # question n -> the on-demand action that opened it (item 17)
         # On the Dynamic profile the model picks a shape per answer (roadmap item 27) and says which
         # on its first line. Kept per question, because everything after that first line is judged by
@@ -164,6 +188,11 @@ class Suggester:
 
     async def handle(self, u: Utterance) -> Optional[Assist]:
         """History first, then suggest if this was a question. None when it was not."""
+        if self.hotkey_only:
+            # answers come only from the "say" action (Ctrl+1); what is heard is just remembered for it
+            if not u.speculative:
+                self.observe(u)
+            return None
         if u.speculative:
             return await self._speculate(u)
         if u.revises is not None and u.revises in self.by_utterance:
@@ -312,8 +341,10 @@ class Suggester:
     async def _ask(self, n: int, u: Utterance, question: str,
                    history: list[tuple[str, str]], ask: Optional[str] = None) -> Assist:
         gen = self.generation[n] = self.generation.get(n, 0) + 1
-        # asked again: the card starts over, and so does the shape it was given, which a retry is
-        # free to place differently (roadmap item 27)
+        # asked again: the card starts over, and so does what it may search for and the shape it
+        # was given, which a retry is free to place differently (roadmap item 27)
+        self.searched.discard(n)
+        self.search_asks.pop(n, None)
         self.answer_style.pop(n, None)
         action = u.trigger == "action" and not ask
         req = self.builder.build(
@@ -357,8 +388,77 @@ class Suggester:
             self.on_result(a)
         return a
 
+    async def search(self, n: int, query: Optional[str] = None) -> Optional[Assist]:
+        """Lines from a web search for a question already answered (roadmap item 10): the card's
+        Search button, or the search the answer itself asked for.
+
+        The query is the one given, else the one the answer asked for, else one the model writes
+        now. Each question is searched once and a call at most `search_limit` times. The lines
+        stream onto the same card as More's do, and the record is marked `more` and `web`, with the
+        pages they came from. A search overtaken by Retry or More while it was out shows nothing.
+        """
+        saved, shown = self.asked.get(n), self.shown_lines.get(n)
+        if self.searcher is None or saved is None or not shown or n in self.searched:
+            return None
+        if self.searches >= self.search_limit:
+            self._search_state(n, "failed", query="",
+                               error=f"this call's {self.search_limit} web searches are used")
+            return None
+        self.searched.add(n)
+        self.searches += 1
+        u, question, history = saved
+        gen = self.generation.get(n)
+        query = query or self.search_asks.get(n)
+        self._search_state(n, "searching", query=query or "")
+        if not query:
+            query = await self._write_query(question, shown, history)
+            if self.generation.get(n) != gen:
+                return None
+            if not query:
+                self._search_state(n, "failed", query="", error="the model did not write a search")
+                return None
+            self._search_state(n, "searching", query=query)
+        reply = await self.searcher.search(query)
+        if self.generation.get(n) != gen:
+            return None
+        if reply.error or not reply.results:
+            self._search_state(n, "failed", query=query, ms=reply.ms,
+                               error=reply.error or "the search found nothing")
+            return None
+        sources = reply.sources()
+        self._search_state(n, "found", query=query, sources=sources, ms=reply.ms)
+        gen = self.generation[n] = self.generation.get(n, 0) + 1
+        req = self.builder.build(search_request(question, shown, reply.results, mode=self.builder.mode),
+                                 history, max_tokens=self.max_tokens)
+        t_request = time.time()
+        accepted = list(shown)
+        s: Suggestion = await collect(self.provider, req, on_line=self._adding_line(n, gen, accepted))
+        if self.generation.get(n) != gen:
+            return None
+        self.shown_lines[n] = accepted
+        a = self._record(u, question, s, t_request, n, announce=False, bullets=accepted[len(shown):],
+                         more=True, web=True, search_query=query, sources=sources)
+        if self.on_result is not None:
+            self.on_result(a)
+        return a
+
+    async def _write_query(self, question: str, shown: list[str],
+                           history: list[tuple[str, str]]) -> Optional[str]:
+        """A search query for the Search button, written by the model from the conversation."""
+        req = self.builder.build(query_request(question, shown), history, max_tokens=self.max_tokens)
+        s: Suggestion = await collect(self.provider, req)
+        for line in s.bullets:
+            found = search_query(line)
+            if found:
+                return found
+        return None
+
+    def _search_state(self, n: int, state: str, **info) -> None:
+        if self.on_search is not None:
+            self.on_search(n, {"state": state, **info})
+
     def _adding_line(self, n: int, gen: int, accepted: list[str]) -> Callable[[str], None]:
-        """Lines added to an answer already on screen (More), filtered with it."""
+        """Lines added to an answer already on screen (More, a web search), filtered with it."""
         extra = len(accepted) + 3
 
         def line(text: str) -> None:
@@ -405,7 +505,7 @@ class Suggester:
         if self.dynamic and n not in self.answer_style:
             # The streaming path normally reads the marker; this covers the runs with no on_line
             # (the console, replay, an eval) and a model that put it somewhere other than first.
-            # Only while the card has no shape yet: More adds to a card that
+            # Only while the card has no shape yet: More and a web search add to a card that
             # already has one, and a marker in their reply must not change it underneath the lines
             # already on screen.
             for line in s.bullets:
@@ -424,6 +524,8 @@ class Suggester:
                 # token arrived, whichever came later
                 end_to_first = u.question_end_to_fire_ms + max(
                     0, round((s.t_first_token - t_shown) * 1000))
+        asked = next((search_query(d.text) for d in dropped if d.reason == "search"), None)
+        marks.setdefault("search_query", asked)
         a = Assist(
             n=n, question=question, bullets=kept if bullets is None else bullets,
             dropped=[{"text": d.text, "reason": d.reason} for d in dropped],
@@ -440,6 +542,12 @@ class Suggester:
             self.log.flush()
         if self.on_result is not None and announce:
             self.on_result(a)
+        if announce and asked and self.searcher is not None:
+            self.search_asks[n] = asked
+            # Only once the answer is on screen, and only while it is still the question being
+            # answered: a search for a question the call has moved past adds lines nobody reads.
+            if kept and not s.error and n == self.n:
+                self.spawn(self.search(n))
         return a
 
 
