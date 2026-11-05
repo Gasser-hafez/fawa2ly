@@ -43,7 +43,10 @@ Fawa2ly sends data to the services you configure, using your own accounts and ke
 - a speech-to-text service (Deepgram) receives the call audio, unless you use local transcription,
   and your microphone while you speak a role in Settings;
 - a model provider (such as Google Gemini, Groq or Cerebras, or a local Ollama) receives the text of
-  the question, recent conversation, your role and your documents;
+  the question, recent conversation, your role and your documents; with Codex that is OpenAI, under
+  the ChatGPT account the Codex app on your computer is signed in with;
+- when web search is turned on, a web search service (Tavily, or OpenAI through Codex) receives short
+  search queries written from the conversation;
 - on first use of local transcription, a model file is downloaded from Hugging Face;
 - each window loads its fonts from Google Fonts when it opens.
 

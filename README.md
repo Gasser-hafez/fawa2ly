@@ -157,11 +157,16 @@ Everything else lives in one Settings window, in five groups.
 - Meeting notes: summary, decisions, action items and open questions, copyable as Markdown.
 
 **Models and providers**
+- Codex: with the Codex app installed and signed in, Fawa2ly finds it and uses your ChatGPT plan,
+  with no key to paste.
 - Cloud: Groq, Google Gemini, Cerebras, OpenAI, Anthropic Claude, OpenRouter, Mistral, DeepSeek,
   xAI Grok, Together AI, Fireworks AI.
 - Local: Ollama, LM Studio, llama.cpp server, vLLM, Jan, or any OpenAI-compatible endpoint you add.
 - A built-in speed test times the first line on every model with a key, so you can use the fastest.
 - Listening: Deepgram in the cloud, or local Whisper (tiny to medium) with no key at all.
+- Web search during a call (off by default): a Search the web button on each answer, and the model
+  can ask for a search itself when an answer needs a current fact. Uses a Tavily key, or Codex.
+- Answer only when asked (off by default): nothing is answered until you press `Ctrl` `1`.
 
 **The overlay**
 - Always on top, draggable, adjustable opacity (only the background fades, never the text).
@@ -183,7 +188,7 @@ They work from any app while Fawa2ly runs, and every one can be changed in Setti
 
 | Action | Default | | Action | Default |
 |---|---|---|---|---|
-| Show / hide the overlay | `Ctrl` `Shift` `P` | | What should I say? | `Ctrl` `Alt` `S` |
+| Show / hide the overlay | `Ctrl` `Shift` `P` | | What should I say? | `Ctrl` `1` |
 | Click-through on / off | `Ctrl` `Shift` `L` | | Recap | `Ctrl` `Alt` `C` |
 | Pause / resume | `Ctrl` `Alt` `Space` | | Questions to ask | `Ctrl` `Alt` `Q` |
 | Previous question | `Ctrl` `Alt` `←` | | More lines | `Ctrl` `Alt` `M` |
@@ -196,7 +201,8 @@ They work from any app while Fawa2ly runs, and every one can be changed in Setti
 |---|---|
 | Call audio | Streamed to Deepgram **only** if you use Deepgram for listening. Never stored. With local Whisper it stays on the machine. |
 | Speaking a role (Settings > Roles > Speak) | Your microphone is streamed to Deepgram for up to a minute, only while you speak. Refused when listening is set to this computer: type the role instead. |
-| What was said, your documents | Sent to the model provider you chose, to write the lines. With a local model (Ollama, LM Studio, …) nothing leaves the machine. |
+| What was said, your documents | Sent to the model provider you chose, to write the lines. With a local model (Ollama, LM Studio, …) nothing leaves the machine. With Codex it goes to OpenAI through the Codex app, under the ChatGPT account it is signed in with. |
+| Web search (off by default) | When turned on, a short query written from the conversation goes to Tavily if you added its key, otherwise to OpenAI through Codex. At most 10 searches a call. |
 | Settings, documents, API keys | Plain files in `%APPDATA%\Fawa2ly` (`~/.fawa2ly` elsewhere). Keys are in `.env` there, and a saved key is never shown again. |
 | Transcripts and call logs | Written **only** if you turn on "Save a transcript of each call". Off by default. |
 | First use of local Whisper | The model downloads once from Hugging Face (about 480 MB for the default size). |
