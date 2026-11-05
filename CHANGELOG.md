@@ -3,6 +3,19 @@
 Each section is the release notes for that version: the release workflow puts it on the GitHub
 release, and the app shows it next to **Update and restart**.
 
+## 0.1.2
+
+- **Codex, with no key.** If the Codex app is installed and signed in on your computer, Fawa2ly
+  finds it and lists it first in the model list, using your ChatGPT plan. A first run picks it on
+  its own. It is under Settings > API keys, with the cloud providers.
+- **Web search during a call** (off by default, Settings > During calls). Each answer gets a Search the web
+  button, and the model can ask for a search itself when an answer needs a current fact. It uses a
+  Tavily key if you add one, otherwise Codex (slower, about 15 seconds).
+- **Answer only when I press Ctrl+1** (off by default). Questions are not answered on their own;
+  Ctrl+1 asks what to say from the conversation so far. It takes effect at once, even during a call.
+- What should I say? is now on `Ctrl` `1` (it was `Ctrl` `Alt` `S`). A hotkey you changed yourself
+  is kept.
+
 ## 0.1.1
 
 Fixes from a full review of the app. Nothing you set up needs to change.
